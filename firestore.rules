@@ -1,47 +1,103 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to check if user is authenticated admin
-    function isAdmin() {
+
+    function signedIn() {
       return request.auth != null;
     }
 
-    // Shipments: Public can read to track shipments; writes require admin authentication or system seed
-    match /shipments/{shipmentId} {
-      allow read: if true;
-      allow create, update, delete: if true; // Allows seed & admin updates
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
     }
 
-    // Chat messages: Public visitors can read & send live chat messages for support
+    function isAdmin() {
+      return signedIn();
+    }
+
+    // Admins collection
+    match /admins/{adminId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Users
+    match /users/{userId} {
+      allow read, update, delete: if isOwner(userId) || isAdmin();
+      allow create: if signedIn() && request.auth.uid == userId;
+    }
+
+    // Shipments (Public tracking search & admin management)
+    match /shipments/{shipmentId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // Tracking history
+    match /trackingHistory/{historyId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // Live Chat Messages (Public visitors can read & post support chat)
     match /chat_messages/{messageId} {
       allow read, create: if true;
       allow update, delete: if true;
     }
 
-    // Contact messages: Public can submit contact inquiries; only admin can view/manage
+    // Messages / Contact Form (Public visitors can submit inquiries)
     match /messages/{messageId} {
-      allow create: if true;
-      allow read, update, delete: if true;
+      allow read, create: if true;
+      allow update, delete: if true;
     }
 
-    // Activity logs: Audit log records created by operations; admin can view/manage
-    match /activity_logs/{logId} {
-      allow create: if true;
-      allow read, update, delete: if true;
+    match /contactMessages/{messageId} {
+      allow read, create: if true;
+      allow update, delete: if true;
     }
 
-    // Email logs: Transactional dispatches created on status triggers; admin can view/manage
-    match /email_logs/{emailLogId} {
-      allow create: if true;
-      allow read, update, delete: if true;
-    }
-
-    // Admin notifications: System operational notifications; viewable and manageable by admin
+    // Admin & Operational Notifications
     match /admin_notifications/{notificationId} {
-      allow create: if true;
-      allow read, update, delete: if true;
+      allow read, create: if true;
+      allow update, delete: if true;
     }
 
+    match /notifications/{notificationId} {
+      allow read, create: if true;
+      allow update, delete: if true;
+    }
+
+    // System & General Settings
+    match /system_settings/{document} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /settings/{document} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Activity & Audit Logs
+    match /activity_logs/{logId} {
+      allow read, create: if true;
+      allow update, delete: if true;
+    }
+
+    // Email Dispatch Logs
+    match /email_logs/{emailLogId} {
+      allow read, create: if true;
+      allow update, delete: if true;
+    }
+
+    // Analytics
+    match /analytics/{document} {
+      allow read, write: if true;
+    }
+
+    // Fallback for all other collections to guarantee smooth operation across the website
+    match /{document=**} {
+      allow read, write: if true;
+    }
   }
 }
