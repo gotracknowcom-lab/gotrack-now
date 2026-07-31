@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Package, Search, Menu, X, ShieldCheck, Phone, Globe, Compass, Lock,
+  Package, Search, Menu, X, ShieldCheck, Compass, Lock,
   Building2, ArrowRight
 } from 'lucide-react';
 
@@ -25,38 +25,6 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-slate-200/80 shadow-sm font-sans">
       
-      {/* Top Corporate Utility Bar */}
-      <div className="bg-slate-900 text-slate-300 py-1.5 px-4 sm:px-6 lg:px-8 text-xs border-b border-slate-800">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <span className="flex items-center gap-1.5 font-medium">
-              <Phone className="w-3.5 h-3.5 text-sky-400" />
-              <span>Global Dispatch: <strong className="text-white font-mono">+1 (800) GOTRACK-EXPRESS</strong></span>
-            </span>
-            <span className="hidden md:flex items-center gap-1.5 text-slate-400">
-              <Globe className="w-3.5 h-3.5 text-emerald-400" />
-              <span>180+ Countries • 24/7 Live GPS Telemetry</span>
-            </span>
-          </div>
-
-          <div className="flex items-center gap-4 text-slate-400">
-            <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              GPS RADAR ACTIVE
-            </span>
-            
-            <button
-              onClick={() => onNavigate('admin')}
-              className="hover:text-white transition-colors flex items-center gap-1 text-xs font-mono font-medium text-slate-300"
-              id="top-bar-staff-login-btn"
-            >
-              <Lock className="w-3 h-3 text-sky-400" />
-              <span>Staff Portal</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Main Navigation Bar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
