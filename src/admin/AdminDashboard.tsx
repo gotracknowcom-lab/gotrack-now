@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth, seedInitialDataIfEmpty, SAMPLE_SHIPMENT_CODE } from '../lib/firebase';
 import {
-  collection, query, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, orderBy
+  collection, query, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, orderBy, limit
 } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { sendShipmentStatusEmail } from '../lib/emailService';
@@ -107,14 +107,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
   const [newTimelineLocation, setNewTimelineLocation] = useState('');
   const [newTimelineDesc, setNewTimelineDesc] = useState('');
 
-  // 1. Subscribe to Firestore Collections Realtime
+  // 1. Subscribe to Firestore Collections Realtime with optimized queries & limits
   useEffect(() => {
     // System Settings Listener
     const unsubSettings = onSnapshot(doc(db, 'system_settings', 'general'), (docSnap) => {
       if (docSnap.exists()) {
         setCompanySettings((prev) => ({ ...prev, ...docSnap.data() }));
       }
-    });
+    }, (err) => console.warn('Settings snapshot listener note:', err));
 
     // Shipments Listener
     const unsubShipments = onSnapshot(collection(db, 'shipments'), (snapshot) => {
@@ -128,46 +128,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
       if (list.length === 0) {
         seedInitialDataIfEmpty();
       }
-    });
+    }, (err) => console.warn('Shipments snapshot listener note:', err));
 
-    // Chat Messages Listener
-    const unsubChats = onSnapshot(collection(db, 'chat_messages'), (snapshot) => {
+    // Chat Messages Listener (limited to 100 recent)
+    const unsubChats = onSnapshot(query(collection(db, 'chat_messages'), limit(100)), (snapshot) => {
       const list: ChatMessage[] = [];
       snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as ChatMessage));
       list.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
       setChatMessages(list);
-    });
+    }, (err) => console.warn('Chat snapshot listener note:', err));
 
-    // Contact Messages Listener
-    const unsubMessages = onSnapshot(collection(db, 'messages'), (snapshot) => {
+    // Contact Messages Listener (limited to 100)
+    const unsubMessages = onSnapshot(query(collection(db, 'messages'), limit(100)), (snapshot) => {
       const list: ContactMessage[] = [];
       snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as ContactMessage));
       setContactMessages(list);
-    });
+    }, (err) => console.warn('Messages snapshot listener note:', err));
 
-    // Activity Logs Listener
-    const unsubLogs = onSnapshot(collection(db, 'activity_logs'), (snapshot) => {
+    // Activity Logs Listener (limited to 50 recent)
+    const unsubLogs = onSnapshot(query(collection(db, 'activity_logs'), limit(50)), (snapshot) => {
       const list: ActivityLog[] = [];
       snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as ActivityLog));
       list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       setActivityLogs(list);
-    });
+    }, (err) => console.warn('Activity logs listener note:', err));
 
-    // Email Logs Listener
-    const unsubEmails = onSnapshot(collection(db, 'email_logs'), (snapshot) => {
+    // Email Logs Listener (limited to 50 recent)
+    const unsubEmails = onSnapshot(query(collection(db, 'email_logs'), limit(50)), (snapshot) => {
       const list: EmailLog[] = [];
       snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as EmailLog));
       list.sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
       setEmailLogs(list);
-    });
+    }, (err) => console.warn('Email logs listener note:', err));
 
-    // Notifications Listener
-    const unsubNotifs = onSnapshot(collection(db, 'admin_notifications'), (snapshot) => {
+    // Notifications Listener (limited to 50 recent)
+    const unsubNotifs = onSnapshot(query(collection(db, 'admin_notifications'), limit(50)), (snapshot) => {
       const list: AdminNotification[] = [];
       snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as AdminNotification));
       list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       setNotifications(list);
-    });
+    }, (err) => console.warn('Notifications listener note:', err));
 
     return () => {
       unsubSettings();

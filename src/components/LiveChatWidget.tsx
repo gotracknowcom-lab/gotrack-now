@@ -38,6 +38,8 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({ trackingCode, cu
       // Unread messages calculation from admin
       const unreads = msgList.filter((m) => m.sender === 'admin' && !m.isRead).length;
       setUnreadCount(unreads);
+    }, (err) => {
+      console.warn('LiveChat widget listener note:', err);
     });
 
     return () => unsubscribe();

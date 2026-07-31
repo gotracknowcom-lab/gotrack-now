@@ -3,6 +3,8 @@ import { getAuth } from 'firebase/auth';
 import {
   getFirestore,
   initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   collection,
   doc,
   getDocs,
@@ -36,13 +38,14 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 
-// Initialize Firestore targeting the custom database specified in config with connection resilience
+// Initialize Firestore targeting the custom database specified in config with fast persistent caching
 const dbId = (firebaseConfigJson as any).firestoreDatabaseId;
 let firestoreDb;
 try {
+  const cacheSettings = { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) };
   firestoreDb = dbId
-    ? initializeFirestore(app, { experimentalAutoDetectLongPolling: true }, dbId)
-    : initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+    ? initializeFirestore(app, cacheSettings, dbId)
+    : initializeFirestore(app, cacheSettings);
 } catch {
   firestoreDb = dbId ? getFirestore(app, dbId) : getFirestore(app);
 }
@@ -249,42 +252,63 @@ export const INITIAL_SAMPLE_SHIPMENT: Shipment = {
   ]
 };
 
+let seedPromise: Promise<boolean> | null = null;
+
 // Seed sample data in Firestore if shipments collection is empty
 export async function seedInitialDataIfEmpty(): Promise<boolean> {
-  try {
-    const shipmentsRef = collection(db, 'shipments');
-    const snapshot = await getDocs(shipmentsRef);
-    if (snapshot.empty) {
-      // Seed sample shipment GT48291584US
-      const sampleDocRef = doc(db, 'shipments', INITIAL_SAMPLE_SHIPMENT.id);
-      await setDoc(sampleDocRef, INITIAL_SAMPLE_SHIPMENT);
+  if (seedPromise) return seedPromise;
 
-      // Create initial activity log
-      await addDoc(collection(db, 'activity_logs'), {
-        type: 'INITIAL_SEED',
-        description: `Database initialized with primary sample shipment ${SAMPLE_SHIPMENT_CODE}`,
-        trackingCode: SAMPLE_SHIPMENT_CODE,
-        timestamp: new Date().toISOString(),
-        user: 'System Admin'
-      });
+  seedPromise = (async () => {
+    try {
+      if (typeof window !== 'undefined' && localStorage.getItem('gotrack_seeded') === 'true') {
+        return false;
+      }
 
-      // Create initial welcome message in chat
-      await addDoc(collection(db, 'chat_messages'), {
-        shipmentId: INITIAL_SAMPLE_SHIPMENT.id,
-        trackingCode: SAMPLE_SHIPMENT_CODE,
-        sender: 'admin',
-        senderName: 'GoTrack Logistics Support',
-        text: `Hello Mr. Vance! Your shipment ${SAMPLE_SHIPMENT_CODE} is currently undergoing US Customs processing at JFK. If you need any assistance, feel free to reply directly here!`,
-        timestamp: new Date().toISOString(),
-        isRead: true
-      });
+      const shipmentsRef = collection(db, 'shipments');
+      const q = query(shipmentsRef, limit(1));
+      const snapshot = await getDocs(q);
 
-      console.log('Successfully seeded initial Firestore shipment data!');
-      return true;
+      if (snapshot.empty) {
+        // Seed sample shipment GT48291584US
+        const sampleDocRef = doc(db, 'shipments', INITIAL_SAMPLE_SHIPMENT.id);
+        await setDoc(sampleDocRef, INITIAL_SAMPLE_SHIPMENT);
+
+        // Create initial activity log
+        await addDoc(collection(db, 'activity_logs'), {
+          type: 'INITIAL_SEED',
+          description: `Database initialized with primary sample shipment ${SAMPLE_SHIPMENT_CODE}`,
+          trackingCode: SAMPLE_SHIPMENT_CODE,
+          timestamp: new Date().toISOString(),
+          user: 'System Admin'
+        });
+
+        // Create initial welcome message in chat
+        await addDoc(collection(db, 'chat_messages'), {
+          shipmentId: INITIAL_SAMPLE_SHIPMENT.id,
+          trackingCode: SAMPLE_SHIPMENT_CODE,
+          sender: 'admin',
+          senderName: 'GoTrack Logistics Support',
+          text: `Hello Mr. Vance! Your shipment ${SAMPLE_SHIPMENT_CODE} is currently undergoing US Customs processing at JFK. If you need any assistance, feel free to reply directly here!`,
+          timestamp: new Date().toISOString(),
+          isRead: true
+        });
+
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('gotrack_seeded', 'true');
+        }
+        console.log('Successfully seeded initial Firestore shipment data!');
+        return true;
+      } else {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('gotrack_seeded', 'true');
+        }
+      }
+      return false;
+    } catch (err) {
+      console.warn('Seed initial data notice:', err);
+      return false;
     }
-    return false;
-  } catch (err) {
-    console.warn('Seed initial data notice:', err);
-    return false;
-  }
+  })();
+
+  return seedPromise;
 }
