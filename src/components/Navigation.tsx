@@ -23,7 +23,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-slate-200/80 shadow-sm font-sans">
+    <header className="sticky top-0 z-50 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 shadow-2xl font-sans text-white">
       
       {/* Main Navigation Bar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -35,15 +35,15 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }
             className="flex items-center gap-3.5 cursor-pointer group"
             id="nav-logo"
           >
-            <div className="w-11 h-11 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-md group-hover:bg-blue-600 transition-colors duration-300">
-              <Package className="w-6 h-6 text-sky-400 group-hover:text-white transition-colors" />
+            <div className="w-11 h-11 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-400 flex items-center justify-center shadow-[0_0_15px_rgba(56,189,248,0.25)] group-hover:bg-sky-500 group-hover:text-slate-950 transition-all duration-300">
+              <Package className="w-6 h-6 transition-colors" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-2xl font-black tracking-tight text-slate-900 font-mono">GO<span className="text-blue-600">TRACK</span></span>
-                <span className="px-1.5 py-0.5 text-[10px] font-extrabold tracking-wider uppercase bg-blue-50 text-blue-700 border border-blue-200 rounded font-mono">EXPRESS</span>
+                <span className="text-2xl font-black tracking-tight text-white font-mono">GO<span className="text-sky-400">TRACK</span></span>
+                <span className="px-1.5 py-0.5 text-[10px] font-extrabold tracking-wider uppercase bg-sky-500/10 text-sky-300 border border-sky-500/30 rounded font-mono">EXPRESS</span>
               </div>
-              <p className="text-[11px] text-slate-500 -mt-0.5 font-medium hidden sm:block">Global Logistics & Supply Chain</p>
+              <p className="text-[11px] text-slate-400 -mt-0.5 font-medium hidden sm:block">Global Logistics & Live Radar</p>
             </div>
           </div>
 
@@ -54,13 +54,13 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }
               value={navSearchCode}
               onChange={(e) => setNavSearchCode(e.target.value)}
               placeholder="Track code (e.g. GT48291584US)..."
-              className="w-full bg-slate-50 text-xs text-slate-900 placeholder-slate-400 pl-9 pr-16 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600 focus:bg-white font-mono transition-all"
+              className="w-full bg-slate-900/90 text-xs text-white placeholder-slate-400 pl-9 pr-16 py-2.5 rounded-xl border border-slate-800 focus:outline-none focus:border-sky-500 focus:bg-slate-900 font-mono transition-all"
               id="header-search-input"
             />
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
             <button
               type="submit"
-              className="absolute right-1 top-1 px-3 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              className="absolute right-1 top-1 px-3 py-1.5 text-xs font-bold bg-sky-500 hover:bg-sky-400 text-slate-950 rounded-lg transition-colors font-mono"
               id="header-search-submit"
             >
               Track
@@ -71,10 +71,10 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }
           <nav className="hidden md:flex items-center gap-1 font-medium text-sm">
             <button
               onClick={() => onNavigate('home')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
+              className={`px-4 py-2 rounded-lg transition-all ${
                 currentTab === 'home'
-                  ? 'bg-blue-50 text-blue-700 font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 font-bold shadow-[0_0_15px_rgba(56,189,248,0.2)]'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-900/80'
               }`}
               id="nav-link-home"
             >
@@ -83,10 +83,10 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }
 
             <button
               onClick={() => onNavigate('track')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
+              className={`px-4 py-2 rounded-lg transition-all ${
                 currentTab === 'track'
-                  ? 'bg-blue-50 text-blue-700 font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 font-bold shadow-[0_0_15px_rgba(56,189,248,0.2)]'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-900/80'
               }`}
               id="nav-link-track"
             >
@@ -95,10 +95,10 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }
 
             <button
               onClick={() => onNavigate('contact')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
+              className={`px-4 py-2 rounded-lg transition-all ${
                 currentTab === 'contact'
-                  ? 'bg-blue-50 text-blue-700 font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 font-bold shadow-[0_0_15px_rgba(56,189,248,0.2)]'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-900/80'
               }`}
               id="nav-link-contact"
             >
@@ -107,10 +107,10 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }
 
             <button
               onClick={() => onNavigate('privacy')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
+              className={`px-4 py-2 rounded-lg transition-all ${
                 currentTab === 'privacy'
-                  ? 'bg-blue-50 text-blue-700 font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 font-bold shadow-[0_0_15px_rgba(56,189,248,0.2)]'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-900/80'
               }`}
               id="nav-link-privacy"
             >
@@ -119,10 +119,10 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }
 
             <button
               onClick={() => onNavigate('terms')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
+              className={`px-4 py-2 rounded-lg transition-all ${
                 currentTab === 'terms'
-                  ? 'bg-blue-50 text-blue-700 font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 font-bold shadow-[0_0_15px_rgba(56,189,248,0.2)]'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-900/80'
               }`}
               id="nav-link-terms"
             >
@@ -134,7 +134,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }
           <div className="hidden sm:flex items-center gap-3">
             <button
               onClick={() => onNavigate('track')}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-5 py-2.5 rounded-xl shadow-sm hover:shadow transition-all"
+              className="flex items-center gap-2 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-slate-950 font-black text-sm px-5 py-2.5 rounded-xl shadow-[0_0_20px_rgba(56,189,248,0.3)] hover:shadow-[0_0_25px_rgba(56,189,248,0.5)] transition-all font-mono"
               id="nav-btn-track-now"
             >
               <Compass className="w-4 h-4" />
@@ -146,10 +146,10 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }
           <div className="md:hidden flex items-center">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none"
+              className="p-2 rounded-lg text-slate-300 hover:bg-slate-900 focus:outline-none"
               id="mobile-menu-toggle"
             >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {mobileMenuOpen ? <X className="w-6 h-6 text-sky-400" /> : <Menu className="w-6 h-6 text-slate-300" />}
             </button>
           </div>
 
@@ -161,24 +161,24 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }
         <div className="fixed inset-0 z-50 flex justify-end md:hidden">
           {/* Semi-transparent Backdrop Overlay */}
           <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-md transition-opacity"
             onClick={() => setMobileMenuOpen(false)}
           />
 
           {/* Sideways Drawer Panel */}
-          <div className="relative w-full max-w-xs bg-white h-full shadow-2xl z-10 flex flex-col justify-between p-6 overflow-y-auto transform transition-transform duration-300 ease-in-out border-l border-slate-200">
+          <div className="relative w-full max-w-xs bg-slate-950 text-white h-full shadow-2xl z-10 flex flex-col justify-between p-6 overflow-y-auto transform transition-transform duration-300 ease-in-out border-l border-slate-800">
             <div>
               {/* Drawer Header */}
-              <div className="flex items-center justify-between pb-6 border-b border-slate-100">
+              <div className="flex items-center justify-between pb-6 border-b border-slate-800">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center">
-                    <Package className="w-4 h-4 text-sky-400" />
+                  <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-400 flex items-center justify-center">
+                    <Package className="w-4 h-4" />
                   </div>
-                  <span className="font-mono font-black text-slate-900 text-lg">GO<span className="text-blue-600">TRACK</span></span>
+                  <span className="font-mono font-black text-white text-lg">GO<span className="text-sky-400">TRACK</span></span>
                 </div>
                 <button
                   onClick={() => setMobileMenuOpen(false)}
-                  className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
+                  className="p-2 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -191,12 +191,12 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }
                   value={navSearchCode}
                   onChange={(e) => setNavSearchCode(e.target.value)}
                   placeholder="Tracking Code (e.g. GT48291584US)"
-                  className="w-full bg-slate-50 text-xs text-slate-900 placeholder-slate-400 pl-9 pr-16 py-3 rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-blue-600 focus:bg-white"
+                  className="w-full bg-slate-900 text-xs text-white placeholder-slate-400 pl-9 pr-16 py-3 rounded-xl border border-slate-800 font-mono focus:outline-none focus:border-sky-500"
                 />
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
                 <button
                   type="submit"
-                  className="absolute right-1 top-1 px-3 py-1.5 text-xs font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="absolute right-1 top-1 px-3 py-1.5 text-xs font-bold bg-sky-500 text-slate-950 rounded-lg hover:bg-sky-400 transition-colors font-mono"
                 >
                   Track
                 </button>
@@ -207,65 +207,65 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }
                 <button
                   onClick={() => { onNavigate('home'); setMobileMenuOpen(false); }}
                   className={`w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-between ${
-                    currentTab === 'home' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
+                    currentTab === 'home' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-900'
                   }`}
                 >
                   <span>Home Landing</span>
-                  <ArrowRight className="w-4 h-4 text-slate-400" />
+                  <ArrowRight className="w-4 h-4 text-slate-500" />
                 </button>
 
                 <button
                   onClick={() => { onNavigate('track'); setMobileMenuOpen(false); }}
                   className={`w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-between ${
-                    currentTab === 'track' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
+                    currentTab === 'track' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-900'
                   }`}
                 >
                   <span>Track Cargo</span>
-                  <ArrowRight className="w-4 h-4 text-slate-400" />
+                  <ArrowRight className="w-4 h-4 text-slate-500" />
                 </button>
 
                 <button
                   onClick={() => { onNavigate('contact'); setMobileMenuOpen(false); }}
                   className={`w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-between ${
-                    currentTab === 'contact' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
+                    currentTab === 'contact' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-900'
                   }`}
                 >
                   <span>Support & Contact</span>
-                  <ArrowRight className="w-4 h-4 text-slate-400" />
+                  <ArrowRight className="w-4 h-4 text-slate-500" />
                 </button>
 
                 <button
                   onClick={() => { onNavigate('privacy'); setMobileMenuOpen(false); }}
                   className={`w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-between ${
-                    currentTab === 'privacy' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
+                    currentTab === 'privacy' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-900'
                   }`}
                 >
                   <span>Privacy Policy</span>
-                  <ArrowRight className="w-4 h-4 text-slate-400" />
+                  <ArrowRight className="w-4 h-4 text-slate-500" />
                 </button>
 
                 <button
                   onClick={() => { onNavigate('terms'); setMobileMenuOpen(false); }}
                   className={`w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-between ${
-                    currentTab === 'terms' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
+                    currentTab === 'terms' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-900'
                   }`}
                 >
                   <span>Terms of Service</span>
-                  <ArrowRight className="w-4 h-4 text-slate-400" />
+                  <ArrowRight className="w-4 h-4 text-slate-500" />
                 </button>
               </nav>
             </div>
 
             {/* Drawer Footer CTA */}
-            <div className="pt-6 border-t border-slate-100 space-y-3">
+            <div className="pt-6 border-t border-slate-800 space-y-3">
               <button
                 onClick={() => { onNavigate('admin'); setMobileMenuOpen(false); }}
-                className="w-full py-3 px-4 rounded-xl text-xs font-mono font-bold bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center gap-2 shadow-sm"
+                className="w-full py-3 px-4 rounded-xl text-xs font-mono font-bold bg-slate-900 hover:bg-slate-800 text-sky-300 border border-sky-500/20 flex items-center justify-center gap-2 shadow-sm"
               >
                 <Lock className="w-4 h-4 text-sky-400" />
                 <span>Staff Terminal Portal</span>
               </button>
-              <p className="text-[10px] text-center text-slate-400 font-mono">GoTrack Express Global Network © 2026</p>
+              <p className="text-[10px] text-center text-slate-500 font-mono">GoTrack Express Global Network © 2026</p>
             </div>
           </div>
         </div>

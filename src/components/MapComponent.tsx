@@ -63,7 +63,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     // Initialize MapLibre GL map
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
-      style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json', // Clean free vector tiles
+      style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json', // Sleek dark vector tiles
       center: shipment.currentCoords || shipment.originCoords,
       zoom: 3,
       attributionControl: false,
@@ -100,9 +100,10 @@ export const MapComponent: React.FC<MapComponentProps> = ({
           'line-cap': 'round',
         },
         paint: {
-          'line-color': '#0f172a',
+          'line-color': '#0284c7',
           'line-width': 8,
-          'line-opacity': 0.3,
+          'line-opacity': 0.4,
+          'line-blur': 4,
         },
       });
 
@@ -116,7 +117,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
           'line-cap': 'round',
         },
         paint: {
-          'line-color': shipment.currentStatus === 'Delayed' ? '#ef4444' : '#0284c7',
+          'line-color': shipment.currentStatus === 'Delayed' ? '#ef4444' : '#38bdf8',
           'line-width': 4,
           'line-dasharray': shipment.isPaused ? [2, 2] : [1],
         },
