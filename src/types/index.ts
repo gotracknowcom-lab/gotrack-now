@@ -68,6 +68,8 @@ export interface Shipment {
   progressPercent: number; // 0 to 100
   isPaused: boolean;
   delayReason?: string;
+  estimatedResume?: string;
+  movementSpeed?: number;
   isArchived?: boolean;
   createdAt: string;
   updatedAt: string;

@@ -50,6 +50,52 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
   const [shipmentToDelete, setShipmentToDelete] = useState<Shipment | null>(null);
   const [resendingEmailCode, setResendingEmailCode] = useState<string | null>(null);
 
+  // Route Simulation & Checkpoint Control State
+  const [isAutoMoving, setIsAutoMoving] = useState(false);
+  const [simSpeed, setSimSpeed] = useState<number>(1);
+  const [delayReasonInput, setDelayReasonInput] = useState('');
+  const [estimatedResumeInput, setEstimatedResumeInput] = useState('2:30 PM UTC');
+  const [showCheckpointModal, setShowCheckpointModal] = useState(false);
+  const [newCheckpointForm, setNewCheckpointForm] = useState({
+    name: '',
+    lat: 40.7128,
+    lng: -74.006,
+    estimatedArrival: 'Estimated 3 Hours',
+    notes: 'Transit checkpoint stop',
+  });
+
+  // Sync inputs when selected shipment changes
+  useEffect(() => {
+    if (selectedShipment) {
+      setDelayReasonInput(selectedShipment.delayReason || '');
+      setEstimatedResumeInput(selectedShipment.estimatedResume || '2:30 PM UTC');
+    }
+  }, [selectedShipment?.id]);
+
+  // Auto-movement interval effect
+  useEffect(() => {
+    if (!isAutoMoving || !selectedShipment || selectedShipment.isPaused) return;
+
+    const interval = setInterval(() => {
+      const currentProg = selectedShipment.progressPercent || 0;
+      if (currentProg >= 100) {
+        setIsAutoMoving(false);
+        handleUpdateShipmentStatus(selectedShipment.id, {
+          progressPercent: 100,
+          currentStatus: 'Delivered',
+        });
+        setToastMessage(`Shipment ${selectedShipment.trackingCode} has reached destination (100%) and marked Delivered!`);
+        return;
+      }
+
+      const delta = simSpeed * 1.5;
+      const nextProg = Math.min(100, currentProg + delta);
+      handleUpdateShipmentStatus(selectedShipment.id, { progressPercent: nextProg });
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [isAutoMoving, simSpeed, selectedShipment?.id, selectedShipment?.progressPercent, selectedShipment?.isPaused]);
+
   // Auto-dismiss toast notification after 4.5 seconds
   useEffect(() => {
     if (toastMessage) {
@@ -443,6 +489,86 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
     } catch (err) {
       console.error('Failed to duplicate shipment:', err);
     }
+  };
+
+  // Advance to next checkpoint stop
+  const handleAdvanceNextCheckpoint = async () => {
+    if (!selectedShipment) return;
+
+    const stops = [...(selectedShipment.stops || [])];
+    if (stops.length === 0) {
+      handleUpdateShipmentStatus(selectedShipment.id, { progressPercent: 100, currentStatus: 'Delivered' });
+      return;
+    }
+
+    const firstIncompleteIdx = stops.findIndex((s) => s.status !== 'completed');
+    if (firstIncompleteIdx === -1) {
+      handleUpdateShipmentStatus(selectedShipment.id, {
+        progressPercent: 100,
+        currentStatus: 'Delivered',
+        currentLocationName: selectedShipment.destination,
+      });
+      setToastMessage(`All checkpoints completed! Shipment ${selectedShipment.trackingCode} marked Delivered.`);
+      return;
+    }
+
+    stops[firstIncompleteIdx] = { ...stops[firstIncompleteIdx], status: 'completed' };
+
+    let nextLocName = stops[firstIncompleteIdx].name;
+    if (firstIncompleteIdx + 1 < stops.length) {
+      stops[firstIncompleteIdx + 1] = { ...stops[firstIncompleteIdx + 1], status: 'current' };
+    } else {
+      nextLocName = selectedShipment.destination;
+    }
+
+    const calcProgress = Math.round(((firstIncompleteIdx + 1) / (stops.length + 1)) * 100);
+
+    await handleUpdateShipmentStatus(selectedShipment.id, {
+      stops,
+      progressPercent: calcProgress,
+      currentLocationName: nextLocName,
+      currentCoords: [stops[firstIncompleteIdx].lng, stops[firstIncompleteIdx].lat],
+    });
+
+    setToastMessage(`Advanced ${selectedShipment.trackingCode} to Checkpoint: ${stops[firstIncompleteIdx].name} (${calcProgress}%)`);
+  };
+
+  // Add Checkpoint Stop
+  const handleAddCheckpointStop = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedShipment) return;
+
+    const existingStops = selectedShipment.stops || [];
+    const newStop: RouteStop = {
+      id: 'stop-' + Date.now(),
+      name: newCheckpointForm.name || 'Transit Waypoint',
+      lat: Number(newCheckpointForm.lat) || 40.71,
+      lng: Number(newCheckpointForm.lng) || -74.0,
+      estimatedArrival: newCheckpointForm.estimatedArrival || 'Scheduled',
+      status: 'upcoming',
+      notes: newCheckpointForm.notes || '',
+    };
+
+    const updatedStops = [...existingStops, newStop];
+    await handleUpdateShipmentStatus(selectedShipment.id, { stops: updatedStops });
+
+    setShowCheckpointModal(false);
+    setNewCheckpointForm({
+      name: '',
+      lat: 40.7128,
+      lng: -74.006,
+      estimatedArrival: 'Estimated 3 Hours',
+      notes: 'Transit checkpoint stop',
+    });
+    setToastMessage(`Checkpoint "${newStop.name}" added to shipment route!`);
+  };
+
+  // Remove Checkpoint Stop
+  const handleRemoveCheckpointStop = async (stopId: string) => {
+    if (!selectedShipment) return;
+    const updatedStops = (selectedShipment.stops || []).filter((s) => s.id !== stopId);
+    await handleUpdateShipmentStatus(selectedShipment.id, { stops: updatedStops });
+    setToastMessage('Checkpoint removed from route.');
   };
 
   // Handle Add Timeline Event
