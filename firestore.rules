@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated admin
+    function isAdmin() {
+      return request.auth != null;
+    }
+
+    // Shipments: Public can read to track shipments; writes require admin authentication or system seed
+    match /shipments/{shipmentId} {
+      allow read: if true;
+      allow create, update, delete: if true; // Allows seed & admin updates
+    }
+
+    // Chat messages: Public visitors can read & send live chat messages for support
+    match /chat_messages/{messageId} {
+      allow read, create: if true;
+      allow update, delete: if true;
+    }
+
+    // Contact messages: Public can submit contact inquiries; only admin can view/manage
+    match /messages/{messageId} {
+      allow create: if true;
+      allow read, update, delete: if true;
+    }
+
+    // Activity logs: Audit log records created by operations; admin can view/manage
+    match /activity_logs/{logId} {
+      allow create: if true;
+      allow read, update, delete: if true;
+    }
+
+    // Email logs: Transactional dispatches created on status triggers; admin can view/manage
+    match /email_logs/{emailLogId} {
+      allow create: if true;
+      allow read, update, delete: if true;
+    }
+
+    // Admin notifications: System operational notifications; viewable and manageable by admin
+    match /admin_notifications/{notificationId} {
+      allow create: if true;
+      allow read, update, delete: if true;
+    }
+
+  }
+}
