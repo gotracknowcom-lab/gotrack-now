@@ -372,89 +372,98 @@ export function generateShipmentEmailHTML(shipment: Shipment, statusTrigger: str
 
 /**
  * Sends automated HTML status email via server API endpoint (/api/send-email)
- * Sends to both customer email and admin email (gotracknow.com@gmail.com).
- * Asynchronous, error-handled, records email execution logs to Firestore.
+ * Sends to the customer email (or admin fallback if unspecified).
+ * Guarantees exactly one email per action using server-side idempotency.
  */
-export async function sendShipmentStatusEmail(shipment: Shipment, statusTrigger: string): Promise<boolean> {
+export async function sendShipmentStatusEmail(
+  shipment: Shipment,
+  statusTrigger: string,
+  customIdempotencyKey?: string
+): Promise<boolean> {
   if (!shipment || !shipment.trackingCode) {
     console.warn('[sendShipmentStatusEmail] Aborted: Missing shipment data.');
     return false;
   }
 
-  const recipients = new Set<string>();
-  if (shipment.customerEmail && shipment.customerEmail.trim()) {
-    recipients.add(shipment.customerEmail.trim());
-  }
-  recipients.add('gotracknow.com@gmail.com');
+  // Single recipient target for notification email
+  const recipientEmail = shipment.customerEmail && shipment.customerEmail.trim()
+    ? shipment.customerEmail.trim()
+    : 'gotracknow.com@gmail.com';
 
   const html = generateShipmentEmailHTML(shipment, statusTrigger);
   const subject = `[GoTrack Update] Shipment ${shipment.trackingCode} - Status: ${statusTrigger}`;
 
+  // Unique idempotency key to prevent server duplicate execution
+  const idempotencyKey = customIdempotencyKey || `${shipment.trackingCode}_${statusTrigger.replace(/\s+/g, '_')}_${Date.now()}`;
+
+  let dispatchStatus: 'delivered' | 'failed' | 'sent' = 'sent';
+  let resendId: string | null = null;
+  let apiErrorMessage: string | null = null;
   let overallSuccess = false;
 
-  for (const recipientEmail of Array.from(recipients)) {
-    let dispatchStatus: 'delivered' | 'failed' | 'sent' = 'sent';
-    let resendId: string | null = null;
-    let apiErrorMessage: string | null = null;
-
-    try {
-      const res = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: recipientEmail,
-          replyTo: 'tracking@gotrack-now.com',
-          subject,
-          html,
-          trackingCode: shipment.trackingCode,
-          statusTrigger,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        dispatchStatus = 'delivered';
-        resendId = data.id || null;
-        overallSuccess = true;
-        console.log(`[Email Dispatch Success] Resend ID: ${resendId} to ${recipientEmail}`);
-      } else {
-        dispatchStatus = 'failed';
-        apiErrorMessage = data.error || 'Server rejected email dispatch';
-        console.warn(`[Email Dispatch Warning to ${recipientEmail}] ${apiErrorMessage}`);
-      }
-    } catch (err: any) {
-      dispatchStatus = 'failed';
-      apiErrorMessage = err.message || 'Network exception dispatching email';
-      console.error('[Email Dispatch Fetch Error]', err);
-    }
-
-    // Record audit log in Firestore email_logs asynchronously
-    try {
-      await addDoc(collection(db, 'email_logs'), {
-        trackingCode: shipment.trackingCode,
-        recipientEmail,
+  try {
+    const res = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: recipientEmail,
+        replyTo: 'tracking@gotrack-now.com',
         subject,
-        statusTrigger,
-        sentAt: new Date().toISOString(),
-        status: dispatchStatus,
-        resendId,
-        errorMessage: apiErrorMessage,
-        htmlBody: html,
-      });
-
-      // Notify admin panel notifications feed
-      await addDoc(collection(db, 'admin_notifications'), {
-        title: dispatchStatus === 'delivered' ? `Email Notification Dispatched` : `Email Dispatch Notice`,
-        message: `Status update (${statusTrigger}) for ${shipment.trackingCode} to ${recipientEmail} - ${dispatchStatus.toUpperCase()}`,
-        timestamp: new Date().toISOString(),
-        read: false,
-        type: 'system',
+        html,
         trackingCode: shipment.trackingCode,
-      });
-    } catch (logErr) {
-      console.error('[Email Log Firestore Error]', logErr);
+        statusTrigger,
+        idempotencyKey,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      dispatchStatus = 'delivered';
+      resendId = data.id || null;
+      overallSuccess = true;
+      if (data.deduplicated) {
+        console.log(`[Email Dispatch Deduplicated] Request with key ${idempotencyKey} was suppressed by server idempotency.`);
+      } else {
+        console.log(`[Email Dispatch Success] Resend ID: ${resendId} to ${recipientEmail}`);
+      }
+    } else {
+      dispatchStatus = 'failed';
+      apiErrorMessage = data.error || 'Server rejected email dispatch';
+      console.warn(`[Email Dispatch Warning to ${recipientEmail}] ${apiErrorMessage}`);
     }
+  } catch (err: any) {
+    dispatchStatus = 'failed';
+    apiErrorMessage = err.message || 'Network exception dispatching email';
+    console.error('[Email Dispatch Fetch Error]', err);
+  }
+
+  // Record single audit log in Firestore email_logs asynchronously
+  try {
+    await addDoc(collection(db, 'email_logs'), {
+      trackingCode: shipment.trackingCode,
+      recipientEmail,
+      subject,
+      statusTrigger,
+      sentAt: new Date().toISOString(),
+      status: dispatchStatus,
+      resendId,
+      errorMessage: apiErrorMessage,
+      idempotencyKey,
+      htmlBody: html,
+    });
+
+    // Notify admin panel notifications feed
+    await addDoc(collection(db, 'admin_notifications'), {
+      title: dispatchStatus === 'delivered' ? `Email Notification Dispatched` : `Email Dispatch Notice`,
+      message: `Status update (${statusTrigger}) for ${shipment.trackingCode} to ${recipientEmail} - ${dispatchStatus.toUpperCase()}`,
+      timestamp: new Date().toISOString(),
+      read: false,
+      type: 'system',
+      trackingCode: shipment.trackingCode,
+    });
+  } catch (logErr) {
+    console.error('[Email Log Firestore Error]', logErr);
   }
 
   return overallSuccess;

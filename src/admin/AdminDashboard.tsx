@@ -371,9 +371,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
         user: 'Admin Controller',
       });
 
-      // Send automated status email notification in background
-      sendShipmentStatusEmail({ id: docRef.id, ...newShipmentData } as Shipment, newShipmentData.currentStatus)
-        .catch((err) => console.warn('Email dispatch warning:', err));
+      // Send automated status email notification with idempotency protection and await response
+      if (companySettings.autoEmailOnUpdate) {
+        const createKey = `create_${docRef.id}_${Date.now()}`;
+        try {
+          await sendShipmentStatusEmail({ id: docRef.id, ...newShipmentData } as Shipment, newShipmentData.currentStatus, createKey);
+        } catch (emailErr) {
+          console.warn('[Create Email Warning]', emailErr);
+        }
+      }
 
       // Select new shipment and reset form data
       setSelectedShipment({ id: docRef.id, ...newShipmentData } as Shipment);
@@ -459,27 +465,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
         user: 'Admin Controller',
       });
 
-      // Automatically dispatch email notification asynchronously
-      let emailTriggerStatus: string = newStatus;
-      if (updates.currentStatus && updates.currentStatus !== target.currentStatus) {
-        emailTriggerStatus = updates.currentStatus;
-      } else if (updates.estimatedDelivery && updates.estimatedDelivery !== target.estimatedDelivery) {
-        emailTriggerStatus = 'Delivery Date Updated';
-      } else if (updates.delayReason && updates.delayReason !== target.delayReason) {
-        emailTriggerStatus = updates.isPaused ? 'Paused' : 'Delayed';
-      } else {
-        emailTriggerStatus = 'Shipment Information Updated';
+      // Automatically dispatch single email notification with idempotency key
+      if (companySettings.autoEmailOnUpdate) {
+        let emailTriggerStatus: string = newStatus;
+        if (updates.currentStatus && updates.currentStatus !== target.currentStatus) {
+          emailTriggerStatus = updates.currentStatus;
+        } else if (updates.estimatedDelivery && updates.estimatedDelivery !== target.estimatedDelivery) {
+          emailTriggerStatus = 'Delivery Date Updated';
+        } else if (updates.delayReason && updates.delayReason !== target.delayReason) {
+          emailTriggerStatus = updates.isPaused ? 'Paused' : 'Delayed';
+        } else {
+          emailTriggerStatus = 'Shipment Information Updated';
+        }
+
+        const updateKey = `update_${shipmentId}_${emailTriggerStatus.replace(/\s+/g, '_')}_${Date.now()}`;
+
+        try {
+          const success = await sendShipmentStatusEmail({ ...target, ...updates } as Shipment, emailTriggerStatus, updateKey);
+          if (success) {
+            console.log(`[Auto Email Dispatched] Notification sent to ${target.customerEmail || 'admin'}`);
+          }
+        } catch (emailErr) {
+          console.warn('[Auto Email Warning]', emailErr);
+        }
       }
 
-      sendShipmentStatusEmail({ ...target, ...updates } as Shipment, emailTriggerStatus)
-        .then((success) => {
-          if (success) {
-            console.log(`[Auto Email Dispatched] Notification sent to ${target.customerEmail}`);
-          }
-        })
-        .catch((err) => console.warn('[Auto Email Warning]', err));
-
-      setToastMessage(`Shipment ${target.trackingCode} updated & email dispatched successfully!`);
+      setToastMessage(`Shipment ${target.trackingCode} updated successfully!`);
     } catch (err: any) {
       console.error('Failed to update shipment:', err);
       setToastMessage(`Update failed: ${err.message || 'Error writing to database'}`);
@@ -1456,20 +1467,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
                   {/* Quick Status Presets */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <button
+                      disabled={isSubmitting}
                       onClick={() => handleUpdateShipmentStatus(selectedShipment.id, { currentStatus: 'Out For Delivery', progressPercent: 90 })}
-                      className="p-3 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-xs font-bold text-sky-400 transition-colors"
+                      className="p-3 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-xs font-bold text-sky-400 transition-colors disabled:opacity-50"
                     >
                       Set "Out for Delivery" (90%)
                     </button>
                     <button
+                      disabled={isSubmitting}
                       onClick={() => handleUpdateShipmentStatus(selectedShipment.id, { currentStatus: 'Delivered', progressPercent: 100 })}
-                      className="p-3 bg-slate-950 hover:bg-emerald-950/40 border border-slate-800 rounded-xl text-xs font-bold text-emerald-400 transition-colors"
+                      className="p-3 bg-slate-950 hover:bg-emerald-950/40 border border-slate-800 rounded-xl text-xs font-bold text-emerald-400 transition-colors disabled:opacity-50"
                     >
                       Mark "Delivered" (100%)
                     </button>
                     <button
+                      disabled={isSubmitting}
                       onClick={() => handleUpdateShipmentStatus(selectedShipment.id, { currentStatus: 'Delayed', isPaused: true, delayReason: 'Weather advisory hold at transit hub.' })}
-                      className="p-3 bg-slate-950 hover:bg-rose-950/40 border border-slate-800 rounded-xl text-xs font-bold text-rose-400 transition-colors"
+                      className="p-3 bg-slate-950 hover:bg-rose-950/40 border border-slate-800 rounded-xl text-xs font-bold text-rose-400 transition-colors disabled:opacity-50"
                     >
                       Mark "Delayed / Hold"
                     </button>

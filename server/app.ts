@@ -20,13 +20,47 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// 2. Resend Email Dispatch Endpoint
+// 2. Resend Email Dispatch Endpoint with Server-Side Idempotency
+interface EmailCacheEntry {
+  timestamp: number;
+  response: { success: boolean; id?: string; error?: string; message?: string };
+}
+
+const emailIdempotencyCache = new Map<string, EmailCacheEntry>();
+
+// Clean up stale cache entries older than 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of emailIdempotencyCache.entries()) {
+    if (now - entry.timestamp > 10 * 60 * 1000) {
+      emailIdempotencyCache.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
 app.post('/api/send-email', async (req, res) => {
   try {
-    const { to, subject, html, trackingCode, replyTo } = req.body;
+    const { to, subject, html, trackingCode, statusTrigger, replyTo, idempotencyKey } = req.body;
 
     if (!to || !subject || !html) {
       return res.status(400).json({ error: 'Missing required fields: to, subject, html' });
+    }
+
+    // Compute effective idempotency key
+    const effectiveKey = idempotencyKey || `${trackingCode || 'NO_CODE'}_${statusTrigger || 'NO_TRIGGER'}_${to}`;
+    const now = Date.now();
+
+    // Check if key was recently processed (within last 3 minutes)
+    if (effectiveKey && emailIdempotencyCache.has(effectiveKey)) {
+      const cached = emailIdempotencyCache.get(effectiveKey)!;
+      if (now - cached.timestamp < 3 * 60 * 1000) {
+        console.log(`[Idempotency Filter] Suppressed duplicate email dispatch for key: ${effectiveKey} | Shipment: #${trackingCode || 'N/A'}`);
+        return res.json({
+          ...cached.response,
+          deduplicated: true,
+          message: 'Duplicate email request suppressed by server idempotency filter.',
+        });
+      }
     }
 
     // Read API Key strictly from environment variable RESEND_API_KEY
@@ -42,7 +76,7 @@ app.post('/api/send-email', async (req, res) => {
     const primarySender = 'GoTrack Express <tracking@gotrack-now.com>';
     const replyToAddress = replyTo || 'tracking@gotrack-now.com';
 
-    console.log(`[Resend API] Dispatching email to ${to} for tracking #${trackingCode || 'N/A'} via ${primarySender}`);
+    console.log(`[Email Request Logged] Timestamp: ${new Date().toISOString()} | Shipment: #${trackingCode || 'N/A'} | Status: ${statusTrigger || 'Update'} | Recipient: ${to} | Key: ${effectiveKey}`);
 
     let response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -99,11 +133,16 @@ app.post('/api/send-email', async (req, res) => {
     }
 
     console.log('[Resend Email Dispatched Successfully]', responseData.id);
-    return res.json({
+    const successRes = {
       success: true,
       id: responseData.id,
       message: 'Email successfully queued/dispatched via Resend',
-    });
+    };
+
+    // Cache successful response for idempotency
+    emailIdempotencyCache.set(effectiveKey, { timestamp: now, response: successRes });
+
+    return res.json(successRes);
   } catch (err: any) {
     console.error('[Send Email Internal Error]', err);
     return res.status(500).json({
