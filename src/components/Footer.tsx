@@ -1,5 +1,6 @@
 import React from 'react';
 import { Package, Shield, Globe, Lock, Mail, MapPin, Phone } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 
 interface FooterProps {
   onNavigate: (tab: string, trackingCode?: string) => void;
@@ -14,8 +15,8 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           {/* Brand Info */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl overflow-hidden border border-sky-500/30 shrink-0 shadow-md">
-                <img src="/logo.png" alt="GoTrack Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              <div className="w-10 h-10 rounded-xl overflow-hidden border border-sky-500/30 shrink-0 shadow-md bg-slate-900">
+                <img src={logoImg} alt="GoTrack Logo" className="w-full h-full object-contain p-0.5" />
               </div>
               <span className="text-2xl font-black text-white font-mono tracking-tight">GO<span className="text-sky-400">TRACK</span></span>
             </div>

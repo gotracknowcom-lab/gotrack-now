@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { auth, seedInitialDataIfEmpty } from '../lib/firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { Shield, Lock, Mail, KeyRound, AlertCircle, PackageCheck, Sparkles } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 
 interface AdminLoginProps {
   onLoginSuccess: () => void;
@@ -73,8 +74,8 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNaviga
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-2 bg-gradient-to-r from-sky-500 via-indigo-500 to-blue-600 rounded-b-full shadow-lg shadow-sky-500/50" />
 
         <div className="text-center space-y-3 mb-8">
-          <div className="w-14 h-14 rounded-2xl overflow-hidden border border-sky-500/30 mx-auto shadow-xl shadow-sky-500/20 shrink-0">
-            <img src="/logo.png" alt="GoTrack Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          <div className="w-14 h-14 rounded-2xl overflow-hidden border border-sky-500/30 mx-auto shadow-xl shadow-sky-500/20 shrink-0 bg-slate-950">
+            <img src={logoImg} alt="GoTrack Logo" className="w-full h-full object-contain p-1" />
           </div>
           <div>
             <h1 className="text-2xl font-black text-white font-mono tracking-tight">GoTrack Staff Terminal</h1>
