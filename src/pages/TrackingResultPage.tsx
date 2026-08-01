@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 import { Shipment } from '../types';
 import { MapComponent } from '../components/MapComponent';
 import { ShipmentTimeline } from '../components/ShipmentTimeline';
@@ -50,25 +50,47 @@ export const TrackingResultPage: React.FC<TrackingResultPageProps> = ({
       where('trackingCode', '==', activeCode.trim().toUpperCase())
     );
 
+    let isMounted = true;
+
+    // Direct query for immediate fast load
+    getDocs(q)
+      .then((snapshot) => {
+        if (isMounted) {
+          if (!snapshot.empty) {
+            const docSnap = snapshot.docs[0];
+            setShipment({ ...docSnap.data(), id: docSnap.id } as Shipment);
+          }
+          setLoading(false);
+        }
+      })
+      .catch((err) => console.warn('Fast lookup note:', err));
+
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        if (!snapshot.empty) {
-          const docSnap = snapshot.docs[0];
-          setShipment({ ...docSnap.data(), id: docSnap.id } as Shipment);
-        } else {
-          setShipment(null);
+        if (isMounted) {
+          if (!snapshot.empty) {
+            const docSnap = snapshot.docs[0];
+            setShipment({ ...docSnap.data(), id: docSnap.id } as Shipment);
+          } else {
+            setShipment(null);
+          }
+          setLoading(false);
         }
-        setLoading(false);
       },
       (err) => {
         console.error('Error fetching shipment from Firestore:', err);
-        setShipment(null);
-        setLoading(false);
+        if (isMounted) {
+          setShipment(null);
+          setLoading(false);
+        }
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, [activeCode]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {

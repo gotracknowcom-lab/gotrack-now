@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Image as ImageIcon, X, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, Image as ImageIcon, X, Link, Plus, Loader2, AlertCircle } from 'lucide-react';
 
 interface CloudinaryUploaderProps {
   images: string[];
@@ -10,11 +10,13 @@ interface CloudinaryUploaderProps {
 export const CloudinaryUploader: React.FC<CloudinaryUploaderProps> = ({
   images,
   onChange,
-  maxFiles = 8,
+  maxFiles = 12,
 }) => {
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [imageUrlInput, setImageUrlInput] = useState('');
+  const [showUrlInput, setShowUrlInput] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Process and upload a file via /api/upload endpoint
@@ -75,6 +77,24 @@ export const CloudinaryUploader: React.FC<CloudinaryUploaderProps> = ({
       onChange([...images, ...newUrls]);
     }
     setUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleAddUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!imageUrlInput.trim()) return;
+    if (images.length >= maxFiles) {
+      setUploadError(`Maximum limit of ${maxFiles} images reached.`);
+      return;
+    }
+
+    const trimmed = imageUrlInput.trim();
+    onChange([...images, trimmed]);
+    setImageUrlInput('');
+    setShowUrlInput(false);
+    setUploadError(null);
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -103,9 +123,37 @@ export const CloudinaryUploader: React.FC<CloudinaryUploaderProps> = ({
 
   return (
     <div className="space-y-3">
-      <label className="block text-xs font-bold text-slate-300 uppercase font-mono">
-        Shipment Photos & Cargo Proofs
-      </label>
+      <div className="flex items-center justify-between">
+        <label className="block text-xs font-bold text-slate-300 uppercase font-mono">
+          Shipment Cargo Photos ({images.length}/{maxFiles})
+        </label>
+        <button
+          type="button"
+          onClick={() => setShowUrlInput(!showUrlInput)}
+          className="text-xs text-sky-400 hover:text-sky-300 font-mono font-bold flex items-center gap-1"
+        >
+          <Link className="w-3.5 h-3.5" />
+          {showUrlInput ? 'Hide URL Input' : 'Add Image URL Link'}
+        </button>
+      </div>
+
+      {showUrlInput && (
+        <form onSubmit={handleAddUrl} className="flex gap-2 p-2 bg-slate-900 border border-slate-800 rounded-xl">
+          <input
+            type="url"
+            value={imageUrlInput}
+            onChange={(e) => setImageUrlInput(e.target.value)}
+            placeholder="Paste direct image URL (https://...)"
+            className="flex-1 bg-slate-950 text-white text-xs p-2 rounded-lg border border-slate-700 font-mono focus:outline-none focus:border-sky-500"
+          />
+          <button
+            type="submit"
+            className="px-3 py-2 bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add
+          </button>
+        </form>
+      )}
 
       {/* Drag & Drop Box */}
       <div
@@ -136,7 +184,7 @@ export const CloudinaryUploader: React.FC<CloudinaryUploaderProps> = ({
             <div className="flex flex-col items-center gap-2">
               <Loader2 className="w-8 h-8 text-sky-400 animate-spin" />
               <p className="text-xs font-mono font-bold text-sky-400">
-                Uploading photo...
+                Uploading photo(s) to cloud...
               </p>
             </div>
           ) : (
@@ -145,10 +193,10 @@ export const CloudinaryUploader: React.FC<CloudinaryUploaderProps> = ({
                 <Upload className="w-6 h-6" />
               </div>
               <p className="text-xs font-bold text-white font-mono">
-                Drag & drop shipment images here, or <span className="text-sky-400 underline">browse files</span>
+                Drag & drop multiple shipment images here, or <span className="text-sky-400 underline">browse files</span>
               </p>
               <p className="text-[10px] text-slate-400 font-mono">
-                Secure Cloud Storage • Max {maxFiles} images
+                Select multiple JPG, PNG, WebP files • Up to {maxFiles} images
               </p>
             </>
           )}
@@ -175,7 +223,7 @@ export const CloudinaryUploader: React.FC<CloudinaryUploaderProps> = ({
                 alt={`Shipment photo ${idx + 1}`}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
-              <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+              <div className="absolute inset-0 bg-slate-950/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 <button
                   type="button"
                   onClick={(e) => {

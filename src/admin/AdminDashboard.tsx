@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth, seedInitialDataIfEmpty, SAMPLE_SHIPMENT_CODE } from '../lib/firebase';
 import {
-  collection, query, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, orderBy, limit
+  collection, query, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, orderBy, limit, getDocs, getDoc
 } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { sendShipmentStatusEmail } from '../lib/emailService';
@@ -155,6 +155,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
 
   // 1. Subscribe to Firestore Collections Realtime with optimized queries & limits
   useEffect(() => {
+    // Fast initial direct fetch for shipments
+    getDocs(collection(db, 'shipments'))
+      .then((snapshot) => {
+        const list: Shipment[] = [];
+        snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as Shipment));
+        list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        setShipments(list);
+        if (list.length === 0) {
+          seedInitialDataIfEmpty();
+        }
+      })
+      .catch((err) => console.warn('Direct fetch note:', err));
+
     // System Settings Listener
     const unsubSettings = onSnapshot(doc(db, 'system_settings', 'general'), (docSnap) => {
       if (docSnap.exists()) {
@@ -385,14 +398,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
 
   // Handle Edit Shipment Update
   const handleUpdateShipmentStatus = async (shipmentId: string, updates: Partial<Shipment>) => {
+    setIsSubmitting(true);
     try {
       const docRef = doc(db, 'shipments', shipmentId);
       const target = shipments.find((s) => s.id === shipmentId);
-      if (!target) return;
+      if (!target) {
+        setIsSubmitting(false);
+        return;
+      }
 
       const newStatus = updates.currentStatus || target.currentStatus;
 
-      // Filter out any undefined values to prevent Firestore updateDoc crashes
+      // Filter out any undefined values to prevent Firestore update crashes
       const cleanUpdates: Record<string, any> = {};
       Object.entries(updates).forEach(([key, value]) => {
         if (value !== undefined) {
@@ -407,7 +424,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
         updatedAt: new Date().toISOString(),
       };
 
-      await updateDoc(docRef, updatedData);
+      // Use setDoc with merge: true to atomically save updates to Firestore
+      await setDoc(docRef, updatedData, { merge: true });
 
       // Log activity
       await addDoc(collection(db, 'activity_logs'), {
@@ -438,19 +456,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
         })
         .catch((err) => console.warn('[Auto Email Warning]', err));
 
-      setToastMessage(`Shipment ${target.trackingCode} updated & email dispatched.`);
+      setToastMessage(`Shipment ${target.trackingCode} updated & email dispatched successfully!`);
     } catch (err: any) {
       console.error('Failed to update shipment:', err);
-      setToastMessage(`Update failed: ${err.message}`);
+      setToastMessage(`Update failed: ${err.message || 'Error writing to database'}`);
+      throw err;
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   // Execute Delete Shipment (Triggered by Modal Confirmation)
   const confirmDeleteShipment = async () => {
     if (!shipmentToDelete) return;
+    setIsSubmitting(true);
 
     try {
+      // Mark system settings as seeded so empty snapshot doesn't auto-restore sample shipment
+      await setDoc(doc(db, 'system_settings', 'general'), { hasSeeded: true }, { merge: true });
+
       await deleteDoc(doc(db, 'shipments', shipmentToDelete.id));
+
       await addDoc(collection(db, 'activity_logs'), {
         type: 'SHIPMENT_DELETED',
         description: `Shipment deleted: ${shipmentToDelete.trackingCode}`,
@@ -458,11 +484,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
         timestamp: new Date().toISOString(),
         user: 'Admin Controller',
       });
-      setToastMessage(`Shipment ${shipmentToDelete.trackingCode} deleted successfully.`);
+
+      setToastMessage(`Shipment ${shipmentToDelete.trackingCode} deleted successfully from database.`);
     } catch (err: any) {
       console.error('Failed to delete shipment:', err);
       setToastMessage(`Delete error: ${err.message}`);
     } finally {
+      setIsSubmitting(false);
       setShipmentToDelete(null);
     }
   };
@@ -1773,7 +1801,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <button
                     onClick={async () => {
-                      await seedInitialDataIfEmpty();
+                      await seedInitialDataIfEmpty(true);
                       setToastMessage('Sample consignment GT48291584US restored successfully!');
                     }}
                     className="p-4 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-left space-y-1 transition-colors"
@@ -1936,30 +1964,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
-                await handleUpdateShipmentStatus(selectedShipment.id, {
-                  customerName: formData.customerName || '',
-                  customerEmail: formData.customerEmail || '',
-                  customerPhone: formData.customerPhone || '',
-                  shipmentType: (formData.shipmentType as ShipmentType) || 'Air',
-                  courier: formData.courier || 'GoTrack Express',
-                  packageName: formData.packageName || '',
-                  brand: formData.brand || '',
-                  model: formData.model || '',
-                  weight: formData.weight || '',
-                  quantity: formData.quantity || 1,
-                  receiver: formData.receiver || '',
-                  origin: formData.origin || '',
-                  destination: formData.destination || '',
-                  currentLocationName: formData.currentLocationName || '',
-                  currentStatus: (formData.currentStatus as ShipmentStatus) || 'Processing',
-                  progressPercent: formData.progressPercent || 0,
-                  isPaused: !!formData.isPaused,
-                  delayReason: formData.delayReason || '',
-                  estimatedDelivery: formData.estimatedDelivery || '',
-                  deliveryInstructions: formData.deliveryInstructions || '',
-                  images: formData.images || [],
-                });
-                setShowEditModal(false);
+                if (!selectedShipment) return;
+                try {
+                  await handleUpdateShipmentStatus(selectedShipment.id, {
+                    customerName: formData.customerName || '',
+                    customerEmail: formData.customerEmail || '',
+                    customerPhone: formData.customerPhone || '',
+                    shipmentType: (formData.shipmentType as ShipmentType) || 'Air',
+                    courier: formData.courier || 'GoTrack Express',
+                    packageName: formData.packageName || '',
+                    brand: formData.brand || '',
+                    model: formData.model || '',
+                    weight: formData.weight || '',
+                    quantity: formData.quantity || 1,
+                    receiver: formData.receiver || '',
+                    origin: formData.origin || '',
+                    destination: formData.destination || '',
+                    currentLocationName: formData.currentLocationName || '',
+                    currentStatus: (formData.currentStatus as ShipmentStatus) || 'Processing',
+                    progressPercent: formData.progressPercent || 0,
+                    isPaused: !!formData.isPaused,
+                    delayReason: formData.delayReason || '',
+                    estimatedDelivery: formData.estimatedDelivery || '',
+                    deliveryInstructions: formData.deliveryInstructions || '',
+                    images: formData.images || [],
+                  });
+                  setShowEditModal(false);
+                } catch (err) {
+                  // Error toast is already displayed inside handleUpdateShipmentStatus
+                }
               }}
               className="space-y-5 text-xs"
             >
@@ -2109,9 +2142,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition-colors shadow-lg"
+                  disabled={isSubmitting}
+                  className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition-colors shadow-lg disabled:opacity-50 flex items-center gap-2"
+                  id="save-dispatch-shipment-btn"
                 >
-                  Save & Dispatch Update Email
+                  {isSubmitting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
+                      <span>Saving & Dispatching...</span>
+                    </>
+                  ) : (
+                    <span>Save & Dispatch Update Email</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -2209,11 +2251,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
               </button>
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={confirmDeleteShipment}
-                className="px-5 py-2 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-xl transition-colors shadow-lg shadow-rose-500/20"
+                className="px-5 py-2 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-xl transition-colors shadow-lg shadow-rose-500/20 disabled:opacity-50 flex items-center gap-1.5"
                 id="confirm-delete-shipment-btn"
               >
-                Delete Consignment
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <span>Delete Consignment</span>
+                )}
               </button>
             </div>
           </div>

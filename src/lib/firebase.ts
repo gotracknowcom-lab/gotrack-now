@@ -38,9 +38,22 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 
-// Initialize Firestore targeting the custom database specified in config
+// Initialize Firestore with fast auto-detect long polling for cloud container environments
 const dbId = (firebaseConfigJson as any).firestoreDatabaseId;
-export const db = dbId ? getFirestore(app, dbId) : getFirestore(app);
+let firestoreDb;
+try {
+  firestoreDb = initializeFirestore(
+    app,
+    {
+      experimentalAutoDetectLongPolling: true,
+    },
+    dbId || undefined
+  );
+} catch (err) {
+  firestoreDb = dbId ? getFirestore(app, dbId) : getFirestore(app);
+}
+
+export const db = firestoreDb;
 
 // Test connection on boot
 (async () => {
@@ -253,34 +266,39 @@ export const INITIAL_SAMPLE_SHIPMENT: Shipment = {
 
 let seedPromise: Promise<boolean> | null = null;
 
-// Seed sample data in Firestore if shipments collection is empty
-export async function seedInitialDataIfEmpty(): Promise<boolean> {
-  if (seedPromise) return seedPromise;
+// Seed sample data in Firestore if shipments collection is empty and has not been seeded yet
+export async function seedInitialDataIfEmpty(force = false): Promise<boolean> {
+  if (seedPromise && !force) return seedPromise;
 
   seedPromise = (async () => {
     try {
+      const settingsDocRef = doc(db, 'system_settings', 'general');
+      const settingsSnap = await getDoc(settingsDocRef);
+      
+      // Do not auto-re-seed if database was already seeded and user deleted items, unless forced
+      if (!force && settingsSnap.exists() && settingsSnap.data()?.hasSeeded) {
+        return false;
+      }
+
       const shipmentsRef = collection(db, 'shipments');
       const q = query(shipmentsRef, limit(1));
       const snapshot = await getDocs(q);
 
-      if (snapshot.empty) {
+      if (force || snapshot.empty) {
         // Seed sample shipment GT48291584US
         const sampleDocRef = doc(db, 'shipments', INITIAL_SAMPLE_SHIPMENT.id);
         await setDoc(sampleDocRef, INITIAL_SAMPLE_SHIPMENT);
 
-        // Seed initial company system settings
-        const settingsDocRef = doc(db, 'system_settings', 'general');
-        const settingsSnap = await getDoc(settingsDocRef);
-        if (!settingsSnap.exists()) {
-          await setDoc(settingsDocRef, {
-            companyName: 'GoTrack Global Logistics',
-            companyPhone: '+1 (800) 555-0199',
-            supportEmail: 'support@gotrack-now.com',
-            emergencyPhone: '+1 (800) 555-9111',
-            resendSender: 'GoTrack Dispatch <tracking@gotrack-now.com>',
-            autoEmailOnStatusChange: true,
-          });
-        }
+        // Seed initial company system settings with hasSeeded flag
+        await setDoc(settingsDocRef, {
+          companyName: 'GoTrack Global Logistics',
+          companyPhone: '+1 (800) 555-0199',
+          supportEmail: 'gotracknow.com@gmail.com',
+          emergencyPhone: '+1 (800) 555-9111',
+          resendSender: 'GoTrack Dispatch <tracking@gotrack-now.com>',
+          autoEmailOnStatusChange: true,
+          hasSeeded: true,
+        }, { merge: true });
 
         // Create initial activity log
         await addDoc(collection(db, 'activity_logs'), {
