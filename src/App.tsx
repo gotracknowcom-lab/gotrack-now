@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { auth, seedInitialDataIfEmpty } from './lib/firebase';
+import { db, auth, seedInitialDataIfEmpty } from './lib/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { Navigation } from './components/Navigation';
 import { Footer } from './components/Footer';
@@ -17,6 +18,7 @@ export default function App() {
   const [activeTrackingCode, setActiveTrackingCode] = useState<string>('');
   const [adminUser, setAdminUser] = useState<User | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
+  const [customLogo, setCustomLogo] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     // Check Firebase Auth state for admin user
@@ -24,6 +26,38 @@ export default function App() {
       setAdminUser(user);
       setAuthChecking(false);
     });
+
+    // Subscribe to system settings for custom logo & favicon
+    const unsubSettings = onSnapshot(doc(db, 'system_settings', 'general'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.logoUrl) {
+          setCustomLogo(data.logoUrl);
+        } else {
+          setCustomLogo(undefined);
+        }
+
+        if (data.faviconUrl) {
+          // Dynamically update favicon in document head
+          const faviconUrl = data.faviconUrl;
+          let favEl = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
+          if (!favEl) {
+            favEl = document.createElement('link');
+            favEl.rel = 'icon';
+            document.head.appendChild(favEl);
+          }
+          favEl.href = faviconUrl;
+
+          let appleEl = document.querySelector("link[rel='apple-touch-icon']") as HTMLLinkElement;
+          if (!appleEl) {
+            appleEl = document.createElement('link');
+            appleEl.rel = 'apple-touch-icon';
+            document.head.appendChild(appleEl);
+          }
+          appleEl.href = faviconUrl;
+        }
+      }
+    }, (err) => console.warn('System settings listener note:', err));
 
     // Sync tab based on URL path and query parameters
     const syncRouteFromUrl = () => {
@@ -58,6 +92,7 @@ export default function App() {
 
     return () => {
       unsubscribe();
+      unsubSettings();
       window.removeEventListener('popstate', syncRouteFromUrl);
     };
   }, []);
