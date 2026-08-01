@@ -162,9 +162,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
         snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as Shipment));
         list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         setShipments(list);
-        if (list.length === 0) {
-          seedInitialDataIfEmpty();
-        }
       })
       .catch((err) => console.warn('Direct fetch note:', err));
 
@@ -182,11 +179,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
       // Sort newest created shipments first
       list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
       setShipments(list);
-
-      // Auto-seed if database is completely empty
-      if (list.length === 0) {
-        seedInitialDataIfEmpty();
-      }
     }, (err) => console.warn('Shipments snapshot listener note:', err));
 
     // Chat Messages Listener (limited to 100 recent)
@@ -382,6 +374,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
       // Send automated status email notification in background
       sendShipmentStatusEmail({ id: docRef.id, ...newShipmentData } as Shipment, newShipmentData.currentStatus)
         .catch((err) => console.warn('Email dispatch warning:', err));
+
+      // Select new shipment and reset form data
+      setSelectedShipment({ id: docRef.id, ...newShipmentData } as Shipment);
+      setFormData({
+        trackingCode: '',
+        customerName: '',
+        customerEmail: '',
+        customerPhone: '',
+        shipmentType: 'Air',
+        courier: 'GoTrack Express',
+        packageName: '',
+        brand: '',
+        model: '',
+        weight: '',
+        quantity: 1,
+        receiver: '',
+        origin: '',
+        destination: '',
+        currentLocationName: '',
+        currentStatus: 'Shipment Created',
+        progressPercent: 5,
+        estimatedDelivery: '',
+        shippingDate: new Date().toISOString().split('T')[0],
+        referenceNumber: '',
+        deliveryInstructions: '',
+        images: [],
+        originCoords: [8.682127, 50.110924],
+        destinationCoords: [-73.935242, 40.73061],
+        delayReason: '',
+        isPaused: false,
+      });
 
       // Reset filters so newly created shipment is immediately visible at the top
       setStatusFilter('all');

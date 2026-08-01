@@ -19,9 +19,6 @@ export default function App() {
   const [authChecking, setAuthChecking] = useState(true);
 
   useEffect(() => {
-    // Seed sample data in Firestore on first launch if empty
-    seedInitialDataIfEmpty();
-
     // Check Firebase Auth state for admin user
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setAdminUser(user);

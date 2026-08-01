@@ -38,8 +38,10 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 
-// Initialize Firestore with fast auto-detect long polling for cloud container environments
-const dbId = (firebaseConfigJson as any).firestoreDatabaseId;
+// Determine database ID (only applicable for the auto-provisioned AI Studio Firebase project)
+const isAutoProvisionedProject = firebaseConfig.projectId === firebaseConfigJson.projectId;
+const dbId = isAutoProvisionedProject ? (firebaseConfigJson as any).firestoreDatabaseId : undefined;
+
 let firestoreDb;
 try {
   firestoreDb = initializeFirestore(
@@ -266,9 +268,10 @@ export const INITIAL_SAMPLE_SHIPMENT: Shipment = {
 
 let seedPromise: Promise<boolean> | null = null;
 
-// Seed sample data in Firestore if shipments collection is empty and has not been seeded yet
+// Seed sample data in Firestore ONLY when explicitly triggered (force = true)
 export async function seedInitialDataIfEmpty(force = false): Promise<boolean> {
-  if (seedPromise && !force) return seedPromise;
+  if (!force) return false;
+  if (seedPromise) return seedPromise;
 
   seedPromise = (async () => {
     try {

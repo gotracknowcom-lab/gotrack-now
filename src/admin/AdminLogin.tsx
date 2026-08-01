@@ -46,9 +46,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNaviga
         }
       }
 
-      // Seed initial sample shipment if database is fresh
-      await seedInitialDataIfEmpty();
-
+      // Set loading false on login success
       setLoading(false);
       onLoginSuccess();
     } catch (err: any) {
