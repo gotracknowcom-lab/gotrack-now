@@ -38,19 +38,18 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 
-// Initialize Firestore targeting the custom database specified in config with fast persistent caching
+// Initialize Firestore targeting the custom database specified in config
 const dbId = (firebaseConfigJson as any).firestoreDatabaseId;
-let firestoreDb;
-try {
-  const cacheSettings = { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) };
-  firestoreDb = dbId
-    ? initializeFirestore(app, cacheSettings, dbId)
-    : initializeFirestore(app, cacheSettings);
-} catch {
-  firestoreDb = dbId ? getFirestore(app, dbId) : getFirestore(app);
-}
+export const db = dbId ? getFirestore(app, dbId) : getFirestore(app);
 
-export const db = firestoreDb;
+// Test connection on boot
+(async () => {
+  try {
+    await getDocs(query(collection(db, 'shipments'), limit(1)));
+  } catch (err) {
+    console.warn('Firestore connectivity note:', err);
+  }
+})();
 
 // Default initial shipment for sample / initial database seeding
 export const SAMPLE_SHIPMENT_CODE = 'GT48291584US';
@@ -260,10 +259,6 @@ export async function seedInitialDataIfEmpty(): Promise<boolean> {
 
   seedPromise = (async () => {
     try {
-      if (typeof window !== 'undefined' && localStorage.getItem('gotrack_seeded') === 'true') {
-        return false;
-      }
-
       const shipmentsRef = collection(db, 'shipments');
       const q = query(shipmentsRef, limit(1));
       const snapshot = await getDocs(q);
@@ -272,6 +267,20 @@ export async function seedInitialDataIfEmpty(): Promise<boolean> {
         // Seed sample shipment GT48291584US
         const sampleDocRef = doc(db, 'shipments', INITIAL_SAMPLE_SHIPMENT.id);
         await setDoc(sampleDocRef, INITIAL_SAMPLE_SHIPMENT);
+
+        // Seed initial company system settings
+        const settingsDocRef = doc(db, 'system_settings', 'general');
+        const settingsSnap = await getDoc(settingsDocRef);
+        if (!settingsSnap.exists()) {
+          await setDoc(settingsDocRef, {
+            companyName: 'GoTrack Global Logistics',
+            companyPhone: '+1 (800) 555-0199',
+            supportEmail: 'support@gotrack-now.com',
+            emergencyPhone: '+1 (800) 555-9111',
+            resendSender: 'GoTrack Dispatch <tracking@gotrack-now.com>',
+            autoEmailOnStatusChange: true,
+          });
+        }
 
         // Create initial activity log
         await addDoc(collection(db, 'activity_logs'), {
@@ -293,15 +302,8 @@ export async function seedInitialDataIfEmpty(): Promise<boolean> {
           isRead: true
         });
 
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('gotrack_seeded', 'true');
-        }
         console.log('Successfully seeded initial Firestore shipment data!');
         return true;
-      } else {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('gotrack_seeded', 'true');
-        }
       }
       return false;
     } catch (err) {

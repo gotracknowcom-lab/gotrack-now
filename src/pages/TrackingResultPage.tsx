@@ -123,7 +123,7 @@ export const TrackingResultPage: React.FC<TrackingResultPageProps> = ({
         {loading && (
           <div className="py-20 text-center space-y-4">
             <div className="w-12 h-12 border-4 border-sky-400 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <p className="text-slate-400 font-mono text-xs font-semibold">Querying GoTrack Global Radar & Firestore Database...</p>
+            <p className="text-slate-400 font-mono text-xs font-semibold">Locating Shipment & Fetching Live Status...</p>
           </div>
         )}
 
@@ -270,7 +270,7 @@ export const TrackingResultPage: React.FC<TrackingResultPageProps> = ({
                   <MapPin className="w-5 h-5 text-sky-400" />
                   Live Satellite GPS Transit Radar
                 </h3>
-                <span className="text-xs font-mono text-slate-400 font-medium">Carto Dark Matter Telemetry</span>
+                <span className="text-xs font-mono text-slate-400 font-medium">Live Map Navigation</span>
               </div>
               <MapComponent shipment={shipment} />
             </div>

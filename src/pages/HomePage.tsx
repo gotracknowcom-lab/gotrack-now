@@ -296,7 +296,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
             <div className="space-y-1">
               <div className="text-3xl sm:text-4xl font-black text-sky-400 font-mono">99.98%</div>
-              <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider font-mono">GPS Telemetry Uptime</div>
+              <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider font-mono">Live System Uptime</div>
             </div>
 
             <div className="space-y-1">
@@ -353,7 +353,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                 Full Container Load (FCL) and Less Container Load (LCL) cargo tracked via AIS satellite positioning.
               </p>
               <ul className="space-y-2.5 text-xs text-slate-300 font-medium">
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> AIS Marine Satellite Telemetry</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> Marine Satellite Tracking</li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> Port Terminal Stacking Logs</li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> Bill of Lading Auto-Validation</li>
               </ul>
@@ -482,7 +482,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                   <Star key={i} className="w-4 h-4 fill-amber-400" />
                 ))}
               </div>
-              <p className="text-sm text-slate-300 italic leading-relaxed">"Cloudinary photo proofs and interactive map routes give our high-value medical shipments complete compliance confidence."</p>
+              <p className="text-sm text-slate-300 italic leading-relaxed">"Live photo proofs and interactive map routes give our high-value medical shipments complete compliance confidence."</p>
               <div className="pt-2 border-t border-slate-800">
                 <strong className="block text-white text-sm">Dr. David Chen</strong>
                 <span className="text-xs text-sky-400 font-mono">Head of Cold Chain, PharmaLink Global</span>

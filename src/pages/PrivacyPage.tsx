@@ -19,19 +19,19 @@ export const PrivacyPage: React.FC = () => {
         <div className="space-y-6 text-sm text-slate-300 leading-relaxed">
           <section className="space-y-2">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Lock className="w-4 h-4 text-sky-400" /> 1. Information Collection & Telemetry Usage
+              <Lock className="w-4 h-4 text-sky-400" /> 1. Information Collection & Tracking Usage
             </h3>
             <p className="text-slate-400">
-              GoTrack Global Logistics ("GoTrack", "We", "Us") collects shipment telemetry data, GPS coordinates, consignee contact information, and delivery milestone logs strictly to fulfill consignment transport and live tracking requirements.
+              GoTrack Global Logistics ("GoTrack", "We", "Us") collects shipment location data, GPS coordinates, contact information, and delivery milestone logs strictly to fulfill consignment transport and live tracking requirements.
             </p>
           </section>
 
           <section className="space-y-2">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Eye className="w-4 h-4 text-emerald-400" /> 2. Data Protection & Firestore Security
+              <Eye className="w-4 h-4 text-emerald-400" /> 2. Data Protection & Cloud Security
             </h3>
             <p className="text-slate-400">
-              All customer tracking records and chat communications stored within our Google Cloud Firestore infrastructure are protected under enterprise security rules. Administrative routing features require authenticated Firebase credentials. Public tracking is restricted to direct tracking code lookups.
+              All customer tracking records and communications stored within our secure cloud database infrastructure are protected under enterprise security rules. Administrative features require verified credentials. Public tracking is restricted to direct tracking code lookups.
             </p>
           </section>
 

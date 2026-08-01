@@ -244,11 +244,11 @@ export const ContactPage: React.FC = () => {
                   id="contact-submit-btn"
                 >
                   {submitting ? (
-                    <span>Transmitting to Firestore...</span>
+                    <span>Sending Message...</span>
                   ) : (
                     <>
                       <Send className="w-4 h-4" />
-                      <span>Transmit Inquiry</span>
+                      <span>Send Message</span>
                     </>
                   )}
                 </button>

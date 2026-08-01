@@ -253,19 +253,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
         timestamp: new Date().toISOString(),
         user: 'Admin Controller',
       });
-      setToastMessage('Organization settings saved and synced to Cloud DB!');
+      setToastMessage('Organization settings saved successfully!');
     } catch (err: any) {
       console.error('Failed to save settings:', err);
-      setToastMessage(`Failed to save settings: ${err.message || 'Firestore write error'}`);
+      setToastMessage(`Failed to save settings: ${err.message || 'Write error'}`);
     } finally {
       setIsSavingSettings(false);
     }
   };
 
-  // Dispatch Test Email via Resend API
+  // Dispatch Test Email
   const handleSendTestEmail = async () => {
     setIsSendingTestEmail(true);
-    setToastMessage('Dispatching test email to gotracknow.com@gmail.com...');
+    setToastMessage('Sending test email to support contact...');
     try {
       const res = await fetch('/api/send-email', {
         method: 'POST',
@@ -273,17 +273,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
         body: JSON.stringify({
           to: companySettings.supportEmail || 'gotracknow.com@gmail.com',
           replyTo: 'tracking@gotrack-now.com',
-          subject: `[GoTrack Test] ${companySettings.companyName} Resend Connectivity Check`,
-          html: `<h3>${companySettings.companyName} System Check</h3><p>Resend email system is active and functioning properly!</p><p>Sender: <code>tracking@gotrack-now.com</code></p>`,
+          subject: `[System Test] ${companySettings.companyName} Email Check`,
+          html: `<h3>${companySettings.companyName} System Check</h3><p>Email system is active and functioning properly!</p>`,
           trackingCode: 'SYSTEM-TEST',
           statusTrigger: 'Test Dispatch',
         }),
       });
       const d = await res.json();
       if (res.ok && d.success) {
-        setToastMessage(`Test email sent successfully! Resend ID: ${d.id}`);
+        setToastMessage('Test email sent successfully!');
       } else {
-        setToastMessage(`Resend API: ${d.error || 'Failed to dispatch email'}`);
+        setToastMessage(`Email Service: ${d.error || 'Failed to send email'}`);
       }
     } catch (err: any) {
       setToastMessage(`Test email error: ${err.message}`);
@@ -377,7 +377,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
       setToastMessage(`Consignment ${code} created & notification email dispatched to ${newShipmentData.customerEmail}!`);
     } catch (err: any) {
       console.error('Failed to create shipment:', err);
-      setToastMessage(`Failed to create consignment: ${err.message || 'Firestore write error'}`);
+      setToastMessage(`Failed to create consignment: ${err.message || 'Save error'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -823,7 +823,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
               {activeTab.replace('_', ' ')} Desk
             </h1>
             <span className="px-2.5 py-0.5 text-[11px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Live Firestore Sync
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Live System Sync
             </span>
           </div>
 
@@ -833,7 +833,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
             <button
               onClick={async () => {
                 await seedInitialDataIfEmpty();
-                alert(`Sample shipment GT48291584US seeded successfully into Firestore!`);
+                setToastMessage('Sample shipment GT48291584US seeded successfully!');
               }}
               className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-sky-400 font-bold text-xs rounded-xl border border-slate-700 transition-colors flex items-center gap-1.5 font-mono"
               id="admin-header-seed-btn"
@@ -907,7 +907,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
                   <Package className="w-5 h-5 text-sky-400" />
                 </div>
                 <div className="text-3xl font-black text-white font-mono">{totalShipments}</div>
-                <span className="text-[11px] text-emerald-400 font-medium">Realtime Firestore Records</span>
+                <span className="text-[11px] text-emerald-400 font-medium">Live Database Records</span>
               </div>
 
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-2">
@@ -1054,7 +1054,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
                     {filteredShipments.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="p-8 text-center text-slate-500">
-                          No shipment records found in Firestore. Click "New Shipment" to create one.
+                          No shipment records found. Click "New Shipment" to create one.
                         </td>
                       </tr>
                     ) : (
@@ -1314,7 +1314,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
                             delayReason: delayReasonInput || 'Consignment hold for customs inspection.',
                             estimatedResume: estimatedResumeInput || '2:30 PM UTC',
                           });
-                          setToastMessage('Saved Delay Notice banner to Firestore live!');
+                          setToastMessage('Saved Delay Notice banner successfully!');
                         }}
                         className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl transition-all font-mono"
                         id="save-delay-notice-btn"
@@ -1641,28 +1641,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-slate-300">Resend Email API</span>
+                      <span className="text-xs font-bold text-slate-300">Email Dispatch Service</span>
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                     </div>
-                    <p className="text-[11px] text-sky-400 font-mono">Active (RESEND_API_KEY)</p>
-                    <p className="text-[10px] text-slate-500">Auto HTML notifications on status updates</p>
+                    <p className="text-[11px] text-sky-400 font-mono">Connected & Operational</p>
+                    <p className="text-[10px] text-slate-500">Auto notifications on status updates</p>
                   </div>
 
                   <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-slate-300">Cloudinary Media CDN</span>
+                      <span className="text-xs font-bold text-slate-300">Photo Upload Vault</span>
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                     </div>
-                    <p className="text-[11px] text-sky-400 font-mono">Cloud: vvkhpeso</p>
-                    <p className="text-[10px] text-slate-500">HTTPS automatic webp/jpeg optimizations</p>
+                    <p className="text-[11px] text-sky-400 font-mono">Secure Cloud Storage</p>
+                    <p className="text-[10px] text-slate-500">HTTPS automatic image processing</p>
                   </div>
 
                   <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-slate-300">Firestore Cloud DB</span>
+                      <span className="text-xs font-bold text-slate-300">Live Cloud Database</span>
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                     </div>
-                    <p className="text-[11px] text-sky-400 font-mono">Realtime Listeners</p>
+                    <p className="text-[11px] text-sky-400 font-mono">Connected & Syncing</p>
                     <p className="text-[10px] text-slate-500">{shipments.length} live consignments loaded</p>
                   </div>
                 </div>
@@ -1712,7 +1712,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-bold mb-1">Resend Verified Dispatch Address</label>
+                      <label className="block text-slate-300 font-bold mb-1">Verified Sender Email Address</label>
                       <input
                         type="text"
                         value={companySettings.resendSender}
@@ -1725,7 +1725,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
                   <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
                     <div>
                       <span className="font-bold text-white block">Automatic Status Change Emails</span>
-                      <span className="text-slate-400 text-[11px]">Send HTML tracking email to consignee automatically on status updates.</span>
+                      <span className="text-slate-400 text-[11px]">Send tracking email to consignee automatically on status updates.</span>
                     </div>
                     <input
                       type="checkbox"
@@ -1748,7 +1748,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
                       ) : (
                         <Send className="w-4 h-4" />
                       )}
-                      Send Test Email via Resend
+                      Send Test Email
                     </button>
 
                     <button
@@ -1774,17 +1774,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
                   <button
                     onClick={async () => {
                       await seedInitialDataIfEmpty();
-                      alert('Sample consignment GT48291584US seeded into Firestore!');
+                      setToastMessage('Sample consignment GT48291584US restored successfully!');
                     }}
                     className="p-4 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-left space-y-1 transition-colors"
                   >
                     <span className="font-bold text-sky-400 text-xs block">Seed Sample Consignment ({SAMPLE_SHIPMENT_CODE})</span>
-                    <span className="text-[11px] text-slate-400 block">Restores demo tracking data into live Firestore collection.</span>
+                    <span className="text-[11px] text-slate-400 block">Restores sample tracking data into live database.</span>
                   </button>
 
                   <button
                     onClick={() => {
-                      alert('Cache cleared and live state re-synchronized with Firestore.');
+                      setToastMessage('Cache cleared and live state re-synchronized successfully!');
                     }}
                     className="p-4 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-left space-y-1 transition-colors"
                   >
@@ -2197,7 +2197,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
             </div>
             <p className="text-xs text-slate-300 leading-relaxed">
               Are you sure you want to permanently delete consignment{' '}
-              <strong className="text-sky-400 font-mono">{shipmentToDelete.trackingCode}</strong>? This action will remove all associated records from Firestore.
+              <strong className="text-sky-400 font-mono">{shipmentToDelete.trackingCode}</strong>? This action will remove all associated records from the database.
             </p>
             <div className="flex justify-end gap-3 pt-2">
               <button

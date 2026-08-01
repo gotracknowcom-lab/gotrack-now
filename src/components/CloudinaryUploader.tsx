@@ -32,13 +32,13 @@ export const CloudinaryUploader: React.FC<CloudinaryUploaderProps> = ({
 
           const data = await res.json();
           if (!res.ok) {
-            throw new Error(data.error || 'Failed to upload to Cloudinary');
+            throw new Error(data.error || 'Failed to upload photo');
           }
 
           resolve(data.url);
         } catch (err: any) {
-          console.error('Cloudinary upload error:', err);
-          setUploadError(err.message || 'Error uploading image to Cloudinary');
+          console.error('Upload error:', err);
+          setUploadError(err.message || 'Error uploading image');
           resolve(null);
         }
       };
@@ -104,7 +104,7 @@ export const CloudinaryUploader: React.FC<CloudinaryUploaderProps> = ({
   return (
     <div className="space-y-3">
       <label className="block text-xs font-bold text-slate-300 uppercase font-mono">
-        Shipment Photos & Cargo Proofs (Cloudinary Upload)
+        Shipment Photos & Cargo Proofs
       </label>
 
       {/* Drag & Drop Box */}
@@ -136,7 +136,7 @@ export const CloudinaryUploader: React.FC<CloudinaryUploaderProps> = ({
             <div className="flex flex-col items-center gap-2">
               <Loader2 className="w-8 h-8 text-sky-400 animate-spin" />
               <p className="text-xs font-mono font-bold text-sky-400">
-                Optimizing & Uploading to Cloudinary CDN...
+                Uploading photo...
               </p>
             </div>
           ) : (
@@ -148,7 +148,7 @@ export const CloudinaryUploader: React.FC<CloudinaryUploaderProps> = ({
                 Drag & drop shipment images here, or <span className="text-sky-400 underline">browse files</span>
               </p>
               <p className="text-[10px] text-slate-400 font-mono">
-                Auto-optimized via Cloudinary HTTPS CDN • Max {maxFiles} images
+                Secure Cloud Storage • Max {maxFiles} images
               </p>
             </>
           )}

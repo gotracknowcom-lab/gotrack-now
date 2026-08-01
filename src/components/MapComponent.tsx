@@ -474,7 +474,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider">
-                {shipment.shipmentType} Freight GPS Telemetry
+                {shipment.shipmentType} Freight Live Map
               </span>
               {isPausedOrHalted ? (
                 <span className="px-2.5 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-300 rounded-full border border-amber-500/40 flex items-center gap-1 font-mono animate-pulse">

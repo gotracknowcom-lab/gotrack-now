@@ -100,7 +100,7 @@ export default function App() {
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center font-sans">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-sky-400 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs text-slate-400 font-mono">Initializing GoTrack Engine & Firebase Credentials...</p>
+          <p className="text-xs text-slate-400 font-mono">Loading GoTrack System...</p>
         </div>
       </div>
     );

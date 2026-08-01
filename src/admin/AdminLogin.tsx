@@ -29,8 +29,18 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNaviga
         await signInWithEmailAndPassword(auth, email, password);
       } catch (signInErr: any) {
         // If account doesn't exist yet, attempt auto-creation for default admin setup
-        if (signInErr.code === 'auth/user-not-found' || signInErr.code === 'auth/invalid-credential') {
-          await createUserWithEmailAndPassword(auth, email, password);
+        if (
+          signInErr.code === 'auth/user-not-found' ||
+          signInErr.code === 'auth/invalid-credential'
+        ) {
+          try {
+            await createUserWithEmailAndPassword(auth, email, password);
+          } catch (createErr: any) {
+            if (createErr.code === 'auth/email-already-in-use') {
+              throw new Error('Incorrect password for this admin account.');
+            }
+            throw createErr;
+          }
         } else {
           throw signInErr;
         }
@@ -43,7 +53,11 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNaviga
       onLoginSuccess();
     } catch (err: any) {
       console.error('Admin Auth Error:', err);
-      setError(err.message || 'Authentication failed. Please verify credentials.');
+      let msg = err.message || 'Authentication failed. Please verify credentials.';
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        msg = 'Incorrect admin credentials. Use admin@gotrack.com and admin123456';
+      }
+      setError(msg);
       setLoading(false);
     }
   };
@@ -119,7 +133,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNaviga
             id="admin-login-submit-btn"
           >
             {loading ? (
-              <span>Authenticating Firebase...</span>
+              <span>Authenticating...</span>
             ) : (
               <>
                 <Lock className="w-4 h-4" />
