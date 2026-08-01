@@ -1,6 +1,6 @@
 {
-  "name": "GoTrack",
-  "description": "Enterprise-grade shipment tracking platform with live GPS mapping, real-time updates, timeline tracking, admin controls, and live chat.",
+  "name": "GoTrack Global Logistics",
+  "description": "Enterprise global logistics and shipment tracking platform featuring live GPS satellite telemetry, interactive radar maps, milestone updates, consignee notifications, and full administrative dispatch controls.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
