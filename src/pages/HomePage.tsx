@@ -4,7 +4,6 @@ import {
   TrendingUp, Award, ArrowRight, ChevronDown, ChevronUp, MapPin, Sparkles, Building2,
   HelpCircle, Calculator, PhoneCall, Users, Shield, Headphones, Star, ArrowUpRight
 } from 'lucide-react';
-import { SAMPLE_SHIPMENT_CODE } from '../lib/firebase';
 
 interface HomePageProps {
   onNavigate: (tab: string, trackingCode?: string) => void;
@@ -176,21 +175,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                       <span>Track Shipment Live</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
-
-                    {/* Sample Code Pills */}
-                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
-                      <span className="text-slate-400 font-medium">Demo Tracking Code:</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTrackingCode(SAMPLE_SHIPMENT_CODE);
-                          onNavigate('track', SAMPLE_SHIPMENT_CODE);
-                        }}
-                        className="px-3 py-1 rounded-lg bg-sky-500/10 text-sky-300 border border-sky-500/30 font-bold font-mono hover:bg-sky-500/20 transition-colors cursor-pointer"
-                      >
-                        {SAMPLE_SHIPMENT_CODE}
-                      </button>
-                    </div>
                   </form>
                 )}
 
@@ -557,11 +541,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           </p>
           <div className="flex justify-center gap-4">
             <button
-              onClick={() => onNavigate('track', SAMPLE_SHIPMENT_CODE)}
+              onClick={() => onNavigate('track')}
               className="px-8 py-4 bg-slate-950 hover:bg-slate-900 text-sky-300 border border-sky-400/40 font-extrabold text-sm rounded-xl transition-all shadow-xl flex items-center gap-2 font-mono"
             >
               <Search className="w-4 h-4 text-sky-400" />
-              <span>Launch Radar Demo ({SAMPLE_SHIPMENT_CODE})</span>
+              <span>Track Your Consignment</span>
             </button>
           </div>
         </div>

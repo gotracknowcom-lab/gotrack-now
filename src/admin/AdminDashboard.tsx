@@ -14,7 +14,7 @@ import {
 import {
   Package, LayoutDashboard, Route, MessageSquare, Mail, Users, FileText, Settings,
   LogOut, Plus, Search, Filter, Edit, Trash2, Copy, Archive, MapPin, Play, Pause,
-  CheckCircle2, AlertTriangle, Clock, RefreshCw, Bell, Shield, Eye, Send, Sparkles, Upload, ChevronRight, X
+  CheckCircle2, AlertTriangle, Clock, RefreshCw, Bell, Shield, Eye, Send, Sparkles, Upload, ChevronRight, X, FastForward
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -1203,7 +1203,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
               {selectedShipment ? (
                 <div className="space-y-6">
                   
-                  {/* Interactive Map with Admin Progress Slider Controls */}
+                  {/* Interactive Map with Admin Controls */}
                   <MapComponent
                     shipment={selectedShipment}
                     isAdminControl={true}
@@ -1216,12 +1216,193 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
                       handleUpdateShipmentStatus(selectedShipment.id, {
                         isPaused: isPaused,
                         currentStatus: isPaused ? 'Paused' : 'International Transit',
-                        delayReason: isPaused ? 'Temporary operational hold by dispatch controller.' : undefined,
+                        delayReason: isPaused ? (delayReasonInput || 'Temporary operational hold by dispatch controller.') : undefined,
                       });
                     }}
+                    onAdvanceNextCheckpoint={handleAdvanceNextCheckpoint}
                   />
 
-                  {/* Route Quick Actions & Delay Reason Input */}
+                  {/* Real-time Movement & Speed Controls */}
+                  <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                      <span className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider">
+                        Real-time Animation & Speed Settings
+                      </span>
+                      
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-400 font-mono">Movement Speed:</span>
+                        {[1, 2, 5, 10].map((spd) => (
+                          <button
+                            key={spd}
+                            onClick={() => setSimSpeed(spd)}
+                            className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg border transition-all ${
+                              simSpeed === spd
+                                ? 'bg-sky-500 text-slate-950 border-sky-400 font-black'
+                                : 'bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800'
+                            }`}
+                          >
+                            {spd}x
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <button
+                        onClick={() => setIsAutoMoving(!isAutoMoving)}
+                        className={`px-5 py-2.5 rounded-xl font-mono text-xs font-black flex items-center gap-2 transition-all ${
+                          isAutoMoving
+                            ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.4)]'
+                            : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.4)]'
+                        }`}
+                        id="auto-movement-toggle-btn"
+                      >
+                        {isAutoMoving ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                        {isAutoMoving ? 'Pause Automatic Speed Transit' : 'Start Auto Smooth Transit (60 FPS)'}
+                      </button>
+
+                      <button
+                        onClick={handleAdvanceNextCheckpoint}
+                        className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-sky-300 border border-slate-700 text-xs font-mono font-bold rounded-xl flex items-center gap-2"
+                        id="advance-checkpoint-tab3-btn"
+                      >
+                        <FastForward className="w-4 h-4 text-sky-400" />
+                        Instantly Advance to Next Checkpoint
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Delay Reason & Resume Time Control Banner */}
+                  <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+                    <h4 className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-400" />
+                      Delay Reason & Resume Notice Editor
+                    </h4>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[11px] text-slate-400 font-mono font-bold block">Delay Reason Banner Text:</label>
+                        <input
+                          type="text"
+                          value={delayReasonInput}
+                          onChange={(e) => setDelayReasonInput(e.target.value)}
+                          placeholder="e.g. Customs clearance inspection hold at Frankfurt terminal..."
+                          className="w-full bg-slate-900 text-white text-xs px-3.5 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-400"
+                          id="delay-reason-input-field"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] text-slate-400 font-mono font-bold block">Estimated Resume Time:</label>
+                        <input
+                          type="text"
+                          value={estimatedResumeInput}
+                          onChange={(e) => setEstimatedResumeInput(e.target.value)}
+                          placeholder="e.g. 2:30 PM UTC"
+                          className="w-full bg-slate-900 text-white text-xs px-3.5 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-400 font-mono"
+                          id="estimated-resume-input-field"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => {
+                          handleUpdateShipmentStatus(selectedShipment.id, {
+                            isPaused: true,
+                            currentStatus: 'Delayed',
+                            delayReason: delayReasonInput || 'Consignment hold for customs inspection.',
+                            estimatedResume: estimatedResumeInput || '2:30 PM UTC',
+                          });
+                          setToastMessage('Saved Delay Notice banner to Firestore live!');
+                        }}
+                        className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl transition-all font-mono"
+                        id="save-delay-notice-btn"
+                      >
+                        Publish Delay Notice Banner
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleUpdateShipmentStatus(selectedShipment.id, {
+                            isPaused: false,
+                            currentStatus: 'International Transit',
+                            delayReason: undefined,
+                            estimatedResume: undefined,
+                          });
+                          setToastMessage('Cleared delay hold; shipment resumed!');
+                        }}
+                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition-all font-mono"
+                        id="clear-delay-notice-btn"
+                      >
+                        Clear Delay Hold & Resume
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Route Checkpoint Waypoints List & Editor */}
+                  <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div>
+                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-sky-400" />
+                          Route Checkpoints & Waypoint Stops ({selectedShipment.stops?.length || 0})
+                        </h4>
+                        <p className="text-[11px] text-slate-400">Add, edit, or remove intermediate checkpoints along the shipment path.</p>
+                      </div>
+
+                      <button
+                        onClick={() => setShowCheckpointModal(true)}
+                        className="px-3.5 py-2 bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs rounded-xl flex items-center gap-1.5 font-mono shadow-md"
+                        id="add-checkpoint-stop-modal-btn"
+                      >
+                        + Add Checkpoint Stop
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {(!selectedShipment.stops || selectedShipment.stops.length === 0) ? (
+                        <p className="text-slate-500 text-xs py-4 text-center font-mono">No intermediate stops defined for this route. Direct Origin ➔ Destination path.</p>
+                      ) : (
+                        selectedShipment.stops.map((stop, idx) => (
+                          <div key={stop.id || idx} className="bg-slate-900 border border-slate-800 p-3.5 rounded-xl flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <span className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 text-sky-400 text-xs font-mono font-bold flex items-center justify-center">
+                                #{idx + 1}
+                              </span>
+                              <div>
+                                <h5 className="text-xs font-bold text-white">{stop.name}</h5>
+                                <span className="text-[11px] text-slate-400 font-mono">
+                                  GPS: ({stop.lat.toFixed(4)}, {stop.lng.toFixed(4)}) • ETA: {stop.estimatedArrival}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border uppercase ${
+                                stop.status === 'completed'
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                  : stop.status === 'current'
+                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
+                                  : 'bg-slate-800 text-slate-400 border-slate-700'
+                              }`}>
+                                {stop.status}
+                              </span>
+
+                              <button
+                                onClick={() => handleRemoveCheckpointStop(stop.id)}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-rose-400 transition-colors"
+                                title="Delete Checkpoint"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Quick Status Presets */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <button
                       onClick={() => handleUpdateShipmentStatus(selectedShipment.id, { currentStatus: 'Out For Delivery', progressPercent: 90 })}
@@ -2039,16 +2220,115 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
         </div>
       )}
 
-      {/* TOAST NOTIFICATION BANNER */}
+      {/* ADD CHECKPOINT STOP MODAL */}
+      {showCheckpointModal && selectedShipment && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 max-w-md w-full rounded-3xl p-6 space-y-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2 font-mono">
+              <MapPin className="w-5 h-5 text-sky-400" /> Add Waypoint Checkpoint Stop
+            </h3>
+            
+            <form onSubmit={handleAddCheckpointStop} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Waypoint / Hub Name</label>
+                <input
+                  type="text"
+                  required
+                  value={newCheckpointForm.name}
+                  onChange={(e) => setNewCheckpointForm({ ...newCheckpointForm, name: e.target.value })}
+                  placeholder="e.g. Frankfurt Cargo Logistics Hub Terminal B"
+                  className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-700"
+                  id="new-checkpoint-name-input"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Latitude Coordinate</label>
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    value={newCheckpointForm.lat}
+                    onChange={(e) => setNewCheckpointForm({ ...newCheckpointForm, lat: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-700 font-mono"
+                    id="new-checkpoint-lat-input"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Longitude Coordinate</label>
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    value={newCheckpointForm.lng}
+                    onChange={(e) => setNewCheckpointForm({ ...newCheckpointForm, lng: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-700 font-mono"
+                    id="new-checkpoint-lng-input"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Estimated Arrival / Departure Window</label>
+                <input
+                  type="text"
+                  value={newCheckpointForm.estimatedArrival}
+                  onChange={(e) => setNewCheckpointForm({ ...newCheckpointForm, estimatedArrival: e.target.value })}
+                  placeholder="e.g. Tomorrow at 14:00 UTC"
+                  className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-700 font-mono"
+                  id="new-checkpoint-eta-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Waypoint Dispatch Notes</label>
+                <input
+                  type="text"
+                  value={newCheckpointForm.notes}
+                  onChange={(e) => setNewCheckpointForm({ ...newCheckpointForm, notes: e.target.value })}
+                  placeholder="e.g. Regional sorting hub scan complete."
+                  className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-700"
+                  id="new-checkpoint-notes-input"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCheckpointModal(false)}
+                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold hover:bg-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-sky-500 hover:bg-sky-400 text-slate-950 font-black rounded-xl font-mono shadow-md"
+                  id="submit-new-checkpoint-btn"
+                >
+                  Save Waypoint Stop
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SLICK TOP SUCCESS / NOTIFICATION BANNER */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white border border-slate-700 shadow-2xl rounded-2xl p-4 max-w-md flex items-start gap-3 animate-in fade-in slide-in-from-bottom-5">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-          <div className="flex-1 text-xs leading-relaxed text-slate-200">
-            {toastMessage}
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-slate-900/95 backdrop-blur-xl text-white border-2 border-emerald-500/80 shadow-[0_0_30px_rgba(16,185,129,0.35)] rounded-2xl p-4 sm:px-6 max-w-lg w-11/12 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-6 duration-300">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-400 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div className="text-xs sm:text-sm font-semibold leading-snug text-slate-100 font-sans">
+              {toastMessage}
+            </div>
           </div>
           <button
             onClick={() => setToastMessage(null)}
-            className="text-slate-400 hover:text-white transition-colors p-1"
+            className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-xl hover:bg-slate-800 shrink-0"
+            title="Dismiss"
           >
             <X className="w-4 h-4" />
           </button>

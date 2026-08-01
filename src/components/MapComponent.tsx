@@ -31,6 +31,38 @@ function calculateBearing(start: [number, number], end: [number, number]): numbe
   return (brng + 360) % 360;
 }
 
+// Built-in raster style generator so map always renders instantly regardless of vector JSON handshakes or network blocks
+const getRasterStyle = (theme: 'dark' | 'light'): maplibregl.StyleSpecification => {
+  const tileUrl = theme === 'dark'
+    ? 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
+    : 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png';
+
+  return {
+    version: 8,
+    sources: {
+      'carto-tiles': {
+        type: 'raster',
+        tiles: [
+          tileUrl,
+          tileUrl.replace('a.basemaps', 'b.basemaps'),
+          tileUrl.replace('a.basemaps', 'c.basemaps'),
+        ],
+        tileSize: 256,
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      },
+    },
+    layers: [
+      {
+        id: 'carto-basemap-layer',
+        type: 'raster',
+        source: 'carto-tiles',
+        minzoom: 0,
+        maxzoom: 19,
+      },
+    ],
+  };
+};
+
 export const MapComponent: React.FC<MapComponentProps> = ({
   shipment,
   isAdminControl = false,
@@ -115,33 +147,52 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     return () => cancelAnimationFrame(frameId);
   }, [shipment.progressPercent, shipment.isPaused, shipment.currentStatus]);
 
-  // Initialize MapLibre GL map
+  // Initialize MapLibre GL map with guaranteed raster tile style & ResizeObserver
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    const styleUrl = mapTheme === 'dark'
-      ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
-      : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
+    let map: maplibregl.Map;
 
-    const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: styleUrl,
-      center: shipment.currentCoords || shipment.originCoords,
-      zoom: 3,
-      attributionControl: false,
-    });
+    try {
+      const style = getRasterStyle(mapTheme);
+      map = new maplibregl.Map({
+        container: mapContainerRef.current,
+        style: style,
+        center: shipment.currentCoords || shipment.originCoords || [-73.7781, 40.6413],
+        zoom: 3,
+        attributionControl: false,
+      });
 
-    mapRef.current = map;
+      mapRef.current = map;
 
-    map.on('load', () => {
-      setMapLoaded(true);
-      renderMapLayersAndMarkers(map);
-    });
+      map.on('load', () => {
+        setMapLoaded(true);
+        renderMapLayersAndMarkers(map);
+        setTimeout(() => map.resize(), 200);
+      });
 
-    return () => {
-      map.remove();
-      mapRef.current = null;
-    };
+      map.on('error', (e) => {
+        console.warn('[Map Component] Map load event note:', e);
+      });
+
+      // ResizeObserver to ensure map canvas recalculates dimensions whenever layout container resizes
+      const resizeObserver = new ResizeObserver(() => {
+        if (mapRef.current) {
+          mapRef.current.resize();
+        }
+      });
+      if (mapContainerRef.current) {
+        resizeObserver.observe(mapContainerRef.current);
+      }
+
+      return () => {
+        resizeObserver.disconnect();
+        map.remove();
+        mapRef.current = null;
+      };
+    } catch (err) {
+      console.error('Map initialization error:', err);
+    }
   }, [mapTheme]);
 
   // Re-render polyline and pins when shipment coordinates or stops change
