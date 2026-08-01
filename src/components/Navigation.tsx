@@ -35,8 +35,8 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }
             className="flex items-center gap-3.5 cursor-pointer group"
             id="nav-logo"
           >
-            <div className="w-11 h-11 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-400 flex items-center justify-center shadow-[0_0_15px_rgba(56,189,248,0.25)] group-hover:bg-sky-500 group-hover:text-slate-950 transition-all duration-300">
-              <Package className="w-6 h-6 transition-colors" />
+            <div className="w-11 h-11 rounded-xl overflow-hidden border border-sky-500/30 text-sky-400 flex items-center justify-center shadow-[0_0_15px_rgba(56,189,248,0.25)] group-hover:border-sky-400 transition-all duration-300 shrink-0">
+              <img src="/logo.png" alt="GoTrack Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
@@ -171,8 +171,8 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }
               {/* Drawer Header */}
               <div className="flex items-center justify-between pb-6 border-b border-slate-800">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-400 flex items-center justify-center">
-                    <Package className="w-4 h-4" />
+                  <div className="w-8 h-8 rounded-lg overflow-hidden border border-sky-500/30 text-sky-400 flex items-center justify-center shrink-0">
+                    <img src="/logo.png" alt="GoTrack Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   </div>
                   <span className="font-mono font-black text-white text-lg">GO<span className="text-sky-400">TRACK</span></span>
                 </div>

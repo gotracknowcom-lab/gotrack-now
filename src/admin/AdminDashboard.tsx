@@ -14,7 +14,7 @@ import {
 import {
   Package, LayoutDashboard, Route, MessageSquare, Mail, Users, FileText, Settings,
   LogOut, Plus, Search, Filter, Edit, Trash2, Copy, Archive, MapPin, Play, Pause,
-  CheckCircle2, AlertTriangle, Clock, RefreshCw, Bell, Shield, Eye, Send, Sparkles, Upload, ChevronRight, X, FastForward
+  CheckCircle2, AlertTriangle, Clock, RefreshCw, Bell, Shield, Eye, Send, Sparkles, Upload, ChevronRight, X, FastForward, Menu
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -49,6 +49,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [shipmentToDelete, setShipmentToDelete] = useState<Shipment | null>(null);
   const [resendingEmailCode, setResendingEmailCode] = useState<string | null>(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Route Simulation & Checkpoint Control State
   const [isAutoMoving, setIsAutoMoving] = useState(false);
@@ -72,7 +73,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
     }
   }, [selectedShipment?.id]);
 
-  // Auto-movement interval effect
+  // Auto-movement interval effect - guaranteed zero email dispatches on progress ticks
   useEffect(() => {
     if (!isAutoMoving || !selectedShipment || selectedShipment.isPaused) return;
 
@@ -90,7 +91,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
 
       const delta = simSpeed * 1.5;
       const nextProg = Math.min(100, currentProg + delta);
-      handleUpdateShipmentStatus(selectedShipment.id, { progressPercent: nextProg });
+      handleUpdateShipmentStatus(selectedShipment.id, { progressPercent: nextProg }, { skipEmail: true });
     }, 1500);
 
     return () => clearInterval(interval);
@@ -426,7 +427,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
   };
 
   // Handle Edit Shipment Update
-  const handleUpdateShipmentStatus = async (shipmentId: string, updates: Partial<Shipment>) => {
+  const handleUpdateShipmentStatus = async (
+    shipmentId: string,
+    updates: Partial<Shipment>,
+    options?: { skipEmail?: boolean }
+  ) => {
     setIsSubmitting(true);
     try {
       const docRef = doc(db, 'shipments', shipmentId);
@@ -465,8 +470,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
         user: 'Admin Controller',
       });
 
-      // Automatically dispatch single email notification with idempotency key
-      if (companySettings.autoEmailOnUpdate) {
+      // Check if update is purely micro progress increment without status change
+      const updateKeys = Object.keys(updates);
+      const isProgressOnly = updateKeys.length === 1 && updateKeys[0] === 'progressPercent';
+
+      // Automatically dispatch single email notification with idempotency key only when appropriate
+      if (companySettings.autoEmailOnUpdate && !options?.skipEmail && !isProgressOnly) {
         let emailTriggerStatus: string = newStatus;
         if (updates.currentStatus && updates.currentStatus !== target.currentStatus) {
           emailTriggerStatus = updates.currentStatus;
@@ -722,14 +731,194 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col lg:flex-row font-sans selection:bg-sky-500 selection:text-slate-950">
       
-      {/* SIDEBAR NAVIGATION */}
-      <aside className="w-full lg:w-64 bg-slate-900 border-r border-slate-800 shrink-0 flex flex-col justify-between">
+      {/* MOBILE TOP HEADER BAR (Only visible on mobile/tablet screens < lg) */}
+      <div className="lg:hidden bg-slate-900 border-b border-slate-800 p-4 flex items-center justify-between sticky top-0 z-40">
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => onNavigatePublic('home')}>
+          <div className="w-9 h-9 rounded-xl overflow-hidden border border-sky-500/30 shrink-0 shadow-md">
+            <img src="/logo.png" alt="GoTrack Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          </div>
+          <div>
+            <span className="text-lg font-black text-white font-mono tracking-tight">GO<span className="text-sky-400">TRACK</span></span>
+            <span className="block text-[9px] font-mono text-sky-400 font-bold uppercase">Admin Console</span>
+          </div>
+        </div>
+        <button
+          onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+          className="p-2.5 rounded-xl bg-slate-800 text-sky-400 hover:bg-slate-700 transition-colors border border-slate-700"
+          id="admin-mobile-menu-toggle"
+        >
+          {mobileSidebarOpen ? <X className="w-5 h-5 text-rose-400" /> : <Menu className="w-5 h-5 text-sky-400" />}
+        </button>
+      </div>
+
+      {/* MOBILE SIDEWAYS SLIDE-OVER DRAWER OVERLAY */}
+      {mobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 flex justify-start lg:hidden">
+          {/* Backdrop Overlay */}
+          <div
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-md transition-opacity"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+
+          {/* Sideways Drawer Panel */}
+          <aside className="relative w-72 bg-slate-900 text-white h-full shadow-2xl z-10 flex flex-col justify-between p-4 overflow-y-auto border-r border-slate-800">
+            <div>
+              <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-3 cursor-pointer" onClick={() => { onNavigatePublic('home'); setMobileSidebarOpen(false); }}>
+                  <div className="w-9 h-9 rounded-xl overflow-hidden border border-sky-500/30 shrink-0 shadow-md">
+                    <img src="/logo.png" alt="GoTrack Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  </div>
+                  <div>
+                    <span className="text-lg font-black text-white font-mono tracking-tight">GO<span className="text-sky-400">TRACK</span></span>
+                    <span className="block text-[9px] font-mono text-sky-400 font-bold uppercase">Admin Console</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setMobileSidebarOpen(false)}
+                  className="p-2 text-slate-400 hover:text-white rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Navigation Links (Mobile Drawer) */}
+              <nav className="p-3 space-y-1 text-sm font-medium mt-2">
+                <button
+                  onClick={() => { setActiveTab('overview'); setMobileSidebarOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                    activeTab === 'overview' ? 'bg-sky-500/10 text-sky-400 font-bold border border-sky-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <LayoutDashboard className="w-5 h-5" />
+                  <span>Overview</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('shipments'); setMobileSidebarOpen(false); }}
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors ${
+                    activeTab === 'shipments' ? 'bg-sky-500/10 text-sky-400 font-bold border border-sky-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Package className="w-5 h-5" />
+                    <span>Shipment Manager</span>
+                  </div>
+                  <span className="px-2 py-0.5 text-xs rounded-full bg-slate-800 text-slate-300 font-mono font-bold">
+                    {totalShipments}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('route_builder'); setMobileSidebarOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                    activeTab === 'route_builder' ? 'bg-sky-500/10 text-sky-400 font-bold border border-sky-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <Route className="w-5 h-5" />
+                  <span>Route & GPS Controller</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('live_chat'); setMobileSidebarOpen(false); }}
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors ${
+                    activeTab === 'live_chat' ? 'bg-sky-500/10 text-sky-400 font-bold border border-sky-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <MessageSquare className="w-5 h-5" />
+                    <span>Customer Live Chat</span>
+                  </div>
+                  {chatMessages.filter(m => m.sender === 'customer' && !m.isRead).length > 0 && (
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-rose-500 text-white font-mono font-bold animate-pulse">
+                      {chatMessages.filter(m => m.sender === 'customer' && !m.isRead).length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('messages'); setMobileSidebarOpen(false); }}
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors ${
+                    activeTab === 'messages' ? 'bg-sky-500/10 text-sky-400 font-bold border border-sky-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Mail className="w-5 h-5" />
+                    <span>Contact Queries</span>
+                  </div>
+                  {unreadMessagesCount > 0 && (
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-amber-500 text-slate-950 font-mono font-bold">
+                      {unreadMessagesCount}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('customers'); setMobileSidebarOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                    activeTab === 'customers' ? 'bg-sky-500/10 text-sky-400 font-bold border border-sky-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <Users className="w-5 h-5" />
+                  <span>Customers Directory</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('logs'); setMobileSidebarOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                    activeTab === 'logs' ? 'bg-sky-500/10 text-sky-400 font-bold border border-sky-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <FileText className="w-5 h-5" />
+                  <span>Audit & Email Logs</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('settings'); setMobileSidebarOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                    activeTab === 'settings' ? 'bg-sky-500/10 text-sky-400 font-bold border border-sky-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <Settings className="w-5 h-5" />
+                  <span>System Settings</span>
+                </button>
+              </nav>
+            </div>
+
+            {/* Mobile Drawer Footer */}
+            <div className="p-4 border-t border-slate-800 space-y-3">
+              <div className="flex items-center gap-3 px-3 py-2 bg-slate-950 rounded-xl border border-slate-800">
+                <div className="w-8 h-8 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-xs">
+                  AD
+                </div>
+                <div className="overflow-hidden text-xs">
+                  <span className="font-bold text-white block truncate">Admin Controller</span>
+                  <span className="text-slate-500 text-[10px] truncate block">admin@gotrack.com</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  signOut(auth);
+                  onLogout();
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-rose-950/40 text-rose-400 hover:text-rose-300 font-bold text-xs flex items-center justify-center gap-2 transition-colors border border-slate-700 hover:border-rose-500/30"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {/* DESKTOP STATIC SIDEBAR NAVIGATION (Visible on lg screens) */}
+      <aside className="hidden lg:flex w-64 bg-slate-900 border-r border-slate-800 shrink-0 flex-col justify-between">
         <div>
           {/* Logo Bar */}
           <div className="p-6 border-b border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => onNavigatePublic('home')}>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center text-slate-950 shadow-md">
-                <Package className="w-6 h-6" />
+              <div className="w-10 h-10 rounded-xl overflow-hidden border border-sky-500/30 text-sky-400 flex items-center justify-center shadow-md shrink-0">
+                <img src="/logo.png" alt="GoTrack Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               </div>
               <div>
                 <span className="text-xl font-black text-white font-mono tracking-tight">GO<span className="text-sky-400">TRACK</span></span>

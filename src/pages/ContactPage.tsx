@@ -121,7 +121,7 @@ export const ContactPage: React.FC = () => {
                   </div>
                   <div>
                     <h5 className="font-bold text-white text-sm">Email Inquiries</h5>
-                    <p className="text-sky-400 font-mono">support@gotrack-logistics.com</p>
+                    <p className="text-sky-400 font-mono">tracking@gotrack-now.com</p>
                   </div>
                 </div>
               </div>

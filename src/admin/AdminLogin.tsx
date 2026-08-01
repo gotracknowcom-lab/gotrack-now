@@ -73,10 +73,8 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNaviga
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-2 bg-gradient-to-r from-sky-500 via-indigo-500 to-blue-600 rounded-b-full shadow-lg shadow-sky-500/50" />
 
         <div className="text-center space-y-3 mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 p-0.5 mx-auto shadow-xl shadow-sky-500/20">
-            <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-sky-400">
-              <Shield className="w-7 h-7" />
-            </div>
+          <div className="w-14 h-14 rounded-2xl overflow-hidden border border-sky-500/30 mx-auto shadow-xl shadow-sky-500/20 shrink-0">
+            <img src="/logo.png" alt="GoTrack Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           </div>
           <div>
             <h1 className="text-2xl font-black text-white font-mono tracking-tight">GoTrack Staff Terminal</h1>

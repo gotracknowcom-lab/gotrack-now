@@ -384,10 +384,14 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 
     if (shipment.shipmentType === 'Air') {
       vehicleSvg = `
-        <svg class="w-7 h-7 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-        </svg>`;
-      shadowColor = 'shadow-[0_0_20px_rgba(56,189,248,0.8)] bg-gradient-to-tr from-sky-600 via-blue-600 to-cyan-400';
+        <div className="relative flex items-center justify-center">
+          {/* Flight Jet Trail Effect behind plane */}
+          <div className="absolute -bottom-3 w-1.5 h-6 bg-gradient-to-t from-transparent via-cyan-400 to-sky-200 rounded-full blur-[1px] opacity-80 animate-pulse"></div>
+          <svg class="w-8 h-8 text-white drop-shadow-[0_2px_12px_rgba(56,189,248,0.9)] transition-transform duration-200" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+          </svg>
+        </div>`;
+      shadowColor = 'shadow-[0_0_25px_rgba(56,189,248,0.95)] bg-gradient-to-tr from-sky-600 via-blue-600 to-cyan-400';
     } else if (shipment.shipmentType === 'Sea') {
       vehicleSvg = `
         <svg class="w-6 h-6 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" fill="currentColor" viewBox="0 0 24 24">

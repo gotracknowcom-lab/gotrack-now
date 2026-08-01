@@ -14,8 +14,8 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           {/* Brand Info */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-sky-400 flex items-center justify-center text-white shadow-md">
-                <Package className="w-5 h-5 text-slate-950" />
+              <div className="w-10 h-10 rounded-xl overflow-hidden border border-sky-500/30 shrink-0 shadow-md">
+                <img src="/logo.png" alt="GoTrack Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               </div>
               <span className="text-2xl font-black text-white font-mono tracking-tight">GO<span className="text-sky-400">TRACK</span></span>
             </div>
@@ -80,7 +80,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <div className="space-y-2 text-xs text-slate-400">
               <p className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-sky-400" /> International Cargo Hub, FRA-JFK Corridor</p>
               <p className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-sky-400" /> +1 (800) GOTRACK-EXPRESS</p>
-              <p className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 text-sky-400" /> dispatch@gotrack-logistics.com</p>
+              <p className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 text-sky-400" /> tracking@gotrack-now.com</p>
             </div>
           </div>
 
