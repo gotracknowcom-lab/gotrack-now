@@ -475,24 +475,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
         user: 'Admin Controller',
       });
 
-      // Check if update is purely micro progress increment without status change
-      const updateKeys = Object.keys(updates);
-      const isProgressOnly = updateKeys.length === 1 && updateKeys[0] === 'progressPercent';
+      // Check if update contains a real status/milestone change
+      const hasStatusChange = updates.currentStatus && updates.currentStatus !== target.currentStatus;
+      const hasDeliveryDateChange = updates.estimatedDelivery && updates.estimatedDelivery !== target.estimatedDelivery;
+      const hasPauseHoldChange = updates.isPaused !== undefined && updates.isPaused !== target.isPaused;
+      const hasMeaningfulMilestone = hasStatusChange || hasDeliveryDateChange || hasPauseHoldChange;
 
       // Automatically dispatch single email notification with idempotency key only when appropriate
-      if (companySettings.autoEmailOnUpdate && !options?.skipEmail && !isProgressOnly) {
+      if (companySettings.autoEmailOnUpdate && !options?.skipEmail && hasMeaningfulMilestone) {
         let emailTriggerStatus: string = newStatus;
-        if (updates.currentStatus && updates.currentStatus !== target.currentStatus) {
-          emailTriggerStatus = updates.currentStatus;
-        } else if (updates.estimatedDelivery && updates.estimatedDelivery !== target.estimatedDelivery) {
+        if (hasStatusChange) {
+          emailTriggerStatus = updates.currentStatus!;
+        } else if (hasDeliveryDateChange) {
           emailTriggerStatus = 'Delivery Date Updated';
-        } else if (updates.delayReason && updates.delayReason !== target.delayReason) {
+        } else if (hasPauseHoldChange) {
           emailTriggerStatus = updates.isPaused ? 'Paused' : 'Delayed';
-        } else {
-          emailTriggerStatus = 'Shipment Information Updated';
         }
 
-        const updateKey = `update_${shipmentId}_${emailTriggerStatus.replace(/\s+/g, '_')}_${Date.now()}`;
+        // Server-side idempotency key based on shipment ID and status trigger (WITHOUT Date.now timestamp to enforce deduplication)
+        const updateKey = `update_${shipmentId}_${emailTriggerStatus.replace(/\s+/g, '_')}`;
 
         try {
           const success = await sendShipmentStatusEmail({ ...target, ...updates } as Shipment, emailTriggerStatus, updateKey);
@@ -604,7 +605,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
       progressPercent: calcProgress,
       currentLocationName: nextLocName,
       currentCoords: [stops[firstIncompleteIdx].lng, stops[firstIncompleteIdx].lat],
-    });
+    }, { skipEmail: true });
 
     setToastMessage(`Advanced ${selectedShipment.trackingCode} to Checkpoint: ${stops[firstIncompleteIdx].name} (${calcProgress}%)`);
   };
@@ -626,7 +627,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
     };
 
     const updatedStops = [...existingStops, newStop];
-    await handleUpdateShipmentStatus(selectedShipment.id, { stops: updatedStops });
+    await handleUpdateShipmentStatus(selectedShipment.id, { stops: updatedStops }, { skipEmail: true });
 
     setShowCheckpointModal(false);
     setNewCheckpointForm({
@@ -643,7 +644,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
   const handleRemoveCheckpointStop = async (stopId: string) => {
     if (!selectedShipment) return;
     const updatedStops = (selectedShipment.stops || []).filter((s) => s.id !== stopId);
-    await handleUpdateShipmentStatus(selectedShipment.id, { stops: updatedStops });
+    await handleUpdateShipmentStatus(selectedShipment.id, { stops: updatedStops }, { skipEmail: true });
     setToastMessage('Checkpoint removed from route.');
   };
 
