@@ -741,7 +741,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
       <div className="lg:hidden bg-slate-900 border-b border-slate-800 p-4 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => onNavigatePublic('home')}>
           <div className="w-9 h-9 rounded-xl overflow-hidden border border-sky-500/30 shrink-0 shadow-md bg-slate-950">
-            <img src={logoImg} alt="GoTrack Logo" className="w-full h-full object-contain p-0.5" />
+            <img src={companySettings.logoUrl || logoUrl || logoImg} alt="GoTrack Logo" className="w-full h-full object-contain p-0.5" />
           </div>
           <div>
             <span className="text-lg font-black text-white font-mono tracking-tight">GO<span className="text-sky-400">TRACK</span></span>
@@ -772,7 +772,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
               <div className="p-4 border-b border-slate-800 flex items-center justify-between">
                 <div className="flex items-center gap-3 cursor-pointer" onClick={() => { onNavigatePublic('home'); setMobileSidebarOpen(false); }}>
                   <div className="w-9 h-9 rounded-xl overflow-hidden border border-sky-500/30 shrink-0 shadow-md bg-slate-950">
-                    <img src={logoImg} alt="GoTrack Logo" className="w-full h-full object-contain p-0.5" />
+                    <img src={companySettings.logoUrl || logoUrl || logoImg} alt="GoTrack Logo" className="w-full h-full object-contain p-0.5" />
                   </div>
                   <div>
                     <span className="text-lg font-black text-white font-mono tracking-tight">GO<span className="text-sky-400">TRACK</span></span>
@@ -924,7 +924,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
           <div className="p-6 border-b border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => onNavigatePublic('home')}>
               <div className="w-10 h-10 rounded-xl overflow-hidden border border-sky-500/30 text-sky-400 flex items-center justify-center shadow-md shrink-0 bg-slate-950">
-                <img src={logoImg} alt="GoTrack Logo" className="w-full h-full object-contain p-0.5" />
+                <img src={companySettings.logoUrl || logoUrl || logoImg} alt="GoTrack Logo" className="w-full h-full object-contain p-0.5" />
               </div>
               <div>
                 <span className="text-xl font-black text-white font-mono tracking-tight">GO<span className="text-sky-400">TRACK</span></span>

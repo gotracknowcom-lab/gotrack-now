@@ -94,16 +94,6 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, logoUrl }) => {
           <div className="flex items-center gap-6">
             <span className="hover:text-slate-400 transition-colors cursor-pointer" onClick={() => onNavigate('privacy')}>Security Standards</span>
             <span className="hover:text-slate-400 transition-colors cursor-pointer" onClick={() => onNavigate('terms')}>Service Level Agreement</span>
-            
-            {/* Discreet Admin Link */}
-            <button
-              onClick={() => onNavigate('admin')}
-              className="text-slate-600 hover:text-slate-400 transition-colors font-mono flex items-center gap-1"
-              id="footer-admin-login-link"
-            >
-              <Lock className="w-3 h-3" />
-              Staff Terminal
-            </button>
           </div>
         </div>
       </div>

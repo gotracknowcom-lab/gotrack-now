@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Package, Search, Menu, X, ShieldCheck, Compass, Lock,
-  Building2, ArrowRight
+  Building2, ArrowRight, Home, PhoneCall, FileText, Globe
 } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 
@@ -168,25 +168,28 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate, 
           />
 
           {/* Sideways Drawer Panel */}
-          <div className="relative w-full max-w-xs bg-slate-950 text-white h-full shadow-2xl z-10 flex flex-col justify-between p-6 overflow-y-auto transform transition-transform duration-300 ease-in-out border-l border-slate-800">
+          <div className="relative w-full max-w-xs bg-slate-950 text-white h-screen shadow-2xl z-10 flex flex-col justify-between p-6 overflow-y-auto transform transition-transform duration-300 ease-in-out border-l border-slate-800">
             <div>
               {/* Drawer Header */}
               <div className="flex items-center justify-between pb-6 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg overflow-hidden border border-sky-500/30 text-sky-400 flex items-center justify-center shrink-0 bg-slate-900">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl overflow-hidden border border-sky-500/30 text-sky-400 flex items-center justify-center shrink-0 bg-slate-900 shadow-md">
                     <img src={logoUrl || logoImg} alt="GoTrack Logo" className="w-full h-full object-contain p-0.5" />
                   </div>
-                  <span className="font-mono font-black text-white text-lg">GO<span className="text-sky-400">TRACK</span></span>
+                  <div>
+                    <span className="font-mono font-black text-white text-lg tracking-tight">GO<span className="text-sky-400">TRACK</span></span>
+                    <span className="block text-[9px] font-mono text-sky-400 uppercase font-bold">Express Global</span>
+                  </div>
                 </div>
                 <button
                   onClick={() => setMobileMenuOpen(false)}
-                  className="p-2 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition-colors"
+                  className="p-2 text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-colors border border-slate-800"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Drawer Search Form */}
+              {/* Drawer Quick Search Form */}
               <form onSubmit={handleNavSearch} className="relative w-full my-6">
                 <input
                   type="text"
@@ -195,7 +198,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate, 
                   placeholder="Tracking Code (e.g. GT48291584US)"
                   className="w-full bg-slate-900 text-xs text-white placeholder-slate-400 pl-9 pr-16 py-3 rounded-xl border border-slate-800 font-mono focus:outline-none focus:border-sky-500"
                 />
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                <Search className="w-4 h-4 text-sky-400 absolute left-3 top-3.5" />
                 <button
                   type="submit"
                   className="absolute right-1 top-1 px-3 py-1.5 text-xs font-bold bg-sky-500 text-slate-950 rounded-lg hover:bg-sky-400 transition-colors font-mono"
@@ -205,69 +208,80 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate, 
               </form>
 
               {/* Navigation Items */}
-              <nav className="space-y-1">
+              <nav className="space-y-1.5">
                 <button
                   onClick={() => { onNavigate('home'); setMobileMenuOpen(false); }}
-                  className={`w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-between ${
-                    currentTab === 'home' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-900'
+                  className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold font-mono transition-colors flex items-center justify-between ${
+                    currentTab === 'home' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-900 hover:text-white'
                   }`}
                 >
-                  <span>Home Landing</span>
+                  <div className="flex items-center gap-3">
+                    <Home className="w-4 h-4 text-sky-400" />
+                    <span>Home Landing</span>
+                  </div>
                   <ArrowRight className="w-4 h-4 text-slate-500" />
                 </button>
 
                 <button
                   onClick={() => { onNavigate('track'); setMobileMenuOpen(false); }}
-                  className={`w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-between ${
-                    currentTab === 'track' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-900'
+                  className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold font-mono transition-colors flex items-center justify-between ${
+                    currentTab === 'track' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-900 hover:text-white'
                   }`}
                 >
-                  <span>Track Cargo</span>
+                  <div className="flex items-center gap-3">
+                    <Compass className="w-4 h-4 text-sky-400" />
+                    <span>Track Cargo</span>
+                  </div>
                   <ArrowRight className="w-4 h-4 text-slate-500" />
                 </button>
 
                 <button
                   onClick={() => { onNavigate('contact'); setMobileMenuOpen(false); }}
-                  className={`w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-between ${
-                    currentTab === 'contact' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-900'
+                  className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold font-mono transition-colors flex items-center justify-between ${
+                    currentTab === 'contact' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-900 hover:text-white'
                   }`}
                 >
-                  <span>Support & Contact</span>
+                  <div className="flex items-center gap-3">
+                    <PhoneCall className="w-4 h-4 text-sky-400" />
+                    <span>Support & Contact</span>
+                  </div>
                   <ArrowRight className="w-4 h-4 text-slate-500" />
                 </button>
 
                 <button
                   onClick={() => { onNavigate('privacy'); setMobileMenuOpen(false); }}
-                  className={`w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-between ${
-                    currentTab === 'privacy' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-900'
+                  className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold font-mono transition-colors flex items-center justify-between ${
+                    currentTab === 'privacy' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-900 hover:text-white'
                   }`}
                 >
-                  <span>Privacy Policy</span>
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="w-4 h-4 text-sky-400" />
+                    <span>Privacy Policy</span>
+                  </div>
                   <ArrowRight className="w-4 h-4 text-slate-500" />
                 </button>
 
                 <button
                   onClick={() => { onNavigate('terms'); setMobileMenuOpen(false); }}
-                  className={`w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-between ${
-                    currentTab === 'terms' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-900'
+                  className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold font-mono transition-colors flex items-center justify-between ${
+                    currentTab === 'terms' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-900 hover:text-white'
                   }`}
                 >
-                  <span>Terms of Service</span>
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-4 h-4 text-sky-400" />
+                    <span>Terms of Service</span>
+                  </div>
                   <ArrowRight className="w-4 h-4 text-slate-500" />
                 </button>
               </nav>
             </div>
 
-            {/* Drawer Footer CTA */}
-            <div className="pt-6 border-t border-slate-800 space-y-3">
-              <button
-                onClick={() => { onNavigate('admin'); setMobileMenuOpen(false); }}
-                className="w-full py-3 px-4 rounded-xl text-xs font-mono font-bold bg-slate-900 hover:bg-slate-800 text-sky-300 border border-sky-500/20 flex items-center justify-center gap-2 shadow-sm"
-              >
-                <Lock className="w-4 h-4 text-sky-400" />
-                <span>Staff Terminal Portal</span>
-              </button>
-              <p className="text-[10px] text-center text-slate-500 font-mono">GoTrack Express Global Network © 2026</p>
+            {/* Drawer Footer */}
+            <div className="pt-6 border-t border-slate-800">
+              <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-500 font-mono">
+                <Globe className="w-3 h-3 text-sky-400" />
+                <span>GoTrack Express Global Network © 2026</span>
+              </div>
             </div>
           </div>
         </div>
