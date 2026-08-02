@@ -8,9 +8,10 @@ import logoImg from '../assets/logo.png';
 interface NavigationProps {
   currentTab: string;
   onNavigate: (tab: string, trackingCode?: string) => void;
+  logoUrl?: string;
 }
 
-export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }) => {
+export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate, logoUrl }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [navSearchCode, setNavSearchCode] = useState('');
 
@@ -37,7 +38,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }
             id="nav-logo"
           >
             <div className="w-11 h-11 rounded-xl overflow-hidden border border-sky-500/30 text-sky-400 flex items-center justify-center shadow-[0_0_15px_rgba(56,189,248,0.25)] group-hover:border-sky-400 transition-all duration-300 shrink-0 bg-slate-900">
-              <img src={logoImg} alt="GoTrack Logo" className="w-full h-full object-contain p-0.5" />
+              <img src={logoUrl || logoImg} alt="GoTrack Logo" className="w-full h-full object-contain p-0.5" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
@@ -173,7 +174,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onNavigate }
               <div className="flex items-center justify-between pb-6 border-b border-slate-800">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg overflow-hidden border border-sky-500/30 text-sky-400 flex items-center justify-center shrink-0 bg-slate-900">
-                    <img src={logoImg} alt="GoTrack Logo" className="w-full h-full object-contain p-0.5" />
+                    <img src={logoUrl || logoImg} alt="GoTrack Logo" className="w-full h-full object-contain p-0.5" />
                   </div>
                   <span className="font-mono font-black text-white text-lg">GO<span className="text-sky-400">TRACK</span></span>
                 </div>

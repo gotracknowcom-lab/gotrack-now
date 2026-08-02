@@ -7,9 +7,10 @@ import logoImg from '../assets/logo.png';
 interface AdminLoginProps {
   onLoginSuccess: () => void;
   onNavigateHome: () => void;
+  logoUrl?: string;
 }
 
-export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNavigateHome }) => {
+export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNavigateHome, logoUrl }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -75,7 +76,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNaviga
 
         <div className="text-center space-y-3 mb-8">
           <div className="w-14 h-14 rounded-2xl overflow-hidden border border-sky-500/30 mx-auto shadow-xl shadow-sky-500/20 shrink-0 bg-slate-950">
-            <img src={logoImg} alt="GoTrack Logo" className="w-full h-full object-contain p-1" />
+            <img src={logoUrl || logoImg} alt="GoTrack Logo" className="w-full h-full object-contain p-1" />
           </div>
           <div>
             <h1 className="text-2xl font-black text-white font-mono tracking-tight">GoTrack Staff Terminal</h1>

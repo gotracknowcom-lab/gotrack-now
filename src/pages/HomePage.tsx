@@ -415,9 +415,9 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               <div className="w-10 h-10 rounded-xl bg-sky-500 text-slate-950 font-mono font-black flex items-center justify-center text-sm shadow-[0_0_15px_rgba(56,189,248,0.3)]">
                 03
               </div>
-              <h4 className="text-lg font-bold text-white">Customs Clearance</h4>
+              <h4 className="text-lg font-bold text-white">Automated Waypoint Dispatch</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Automated document verification at airport terminals and border checkpoints with instant status notifications.
+                Seamless intermodal sorting, automated hub milestone logs, and rapid transit dispatch across air, ocean, and road networks.
               </p>
             </div>
 

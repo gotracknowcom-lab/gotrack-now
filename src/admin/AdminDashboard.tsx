@@ -8,6 +8,7 @@ import { sendShipmentStatusEmail } from '../lib/emailService';
 import { Shipment, ShipmentStatus, ShipmentType, ChatMessage, ContactMessage, ActivityLog, EmailLog, AdminNotification, RouteStop, TimelineEvent } from '../types';
 import { MapComponent } from '../components/MapComponent';
 import { CloudinaryUploader } from '../components/CloudinaryUploader';
+import { SingleImageUploader } from '../components/SingleImageUploader';
 import logoImg from '../assets/logo.png';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
@@ -21,9 +22,10 @@ import {
 interface AdminDashboardProps {
   onLogout: () => void;
   onNavigatePublic: (tab: string, trackingCode?: string) => void;
+  logoUrl?: string;
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavigatePublic }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavigatePublic, logoUrl }) => {
   const [activeTab, setActiveTab] = useState<
     'overview' | 'shipments' | 'route_builder' | 'live_chat' | 'messages' | 'customers' | 'logs' | 'settings'
   >('overview');
@@ -117,6 +119,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
     supportPhone: '+1 (800) 555-0199',
     resendSender: 'GoTrack Express <tracking@gotrack-now.com>',
     autoEmailOnUpdate: true,
+    logoUrl: '',
+    faviconUrl: '',
   });
 
   // Form State for Shipment Creation / Editing
@@ -1977,6 +1981,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
                     </div>
                   </div>
 
+                  {/* Brand Logo & Favicon Customization Card */}
+                  <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-4">
+                    <h4 className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-sky-400" /> Website Branding, Favicon & Logo Upload
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <SingleImageUploader
+                        label="Brand Logo Image"
+                        value={companySettings.logoUrl || ''}
+                        onChange={(url) => setCompanySettings({ ...companySettings, logoUrl: url })}
+                        aspectHint="Upload PNG, JPG, or SVG logo file (Square or Horizontal)"
+                      />
+                      <SingleImageUploader
+                        label="Browser Tab Favicon Icon"
+                        value={companySettings.faviconUrl || ''}
+                        onChange={(url) => setCompanySettings({ ...companySettings, faviconUrl: url })}
+                        aspectHint="Upload 32x32 or 64x64 PNG, ICO, or SVG icon file"
+                        accept="image/*,.ico"
+                      />
+                    </div>
+                  </div>
+
                   <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
                     <div>
                       <span className="font-bold text-white block">Automatic Status Change Emails</span>
@@ -2058,93 +2084,297 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
       {/* CREATE SHIPMENT MODAL */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 max-w-2xl w-full rounded-3xl p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold text-white">Create New Consignment</h3>
+          <div className="bg-slate-900 border border-slate-800 max-w-3xl w-full rounded-3xl p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Package className="w-6 h-6 text-sky-400" /> Create & Register Consignment
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">Register a new cargo shipment with real-time tracking, ETA schedule, and consignee alerts.</p>
+              </div>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
             
-            <form onSubmit={handleCreateShipment} className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">Tracking Code (Auto-generated)</label>
-                  <input
-                    type="text"
-                    value={formData.trackingCode}
-                    onChange={(e) => setFormData({ ...formData, trackingCode: e.target.value })}
-                    className="w-full bg-slate-950 text-sky-400 font-mono font-bold p-3 rounded-xl border border-slate-700"
-                  />
+            <form onSubmit={handleCreateShipment} className="space-y-6 text-xs">
+              
+              {/* SECTION 1: CONSSIGNEE & CLIENT DETAILS */}
+              <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+                <h4 className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider flex items-center gap-2">
+                  <Users className="w-4 h-4" /> 1. Consignee & Customer Contact
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Tracking Code (Auto-generated or custom)</label>
+                    <input
+                      type="text"
+                      value={formData.trackingCode}
+                      onChange={(e) => setFormData({ ...formData, trackingCode: e.target.value })}
+                      className="w-full bg-slate-900 text-sky-400 font-mono font-bold p-3 rounded-xl border border-slate-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Customer / Consignee Full Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.customerName}
+                      onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                      placeholder="e.g. Eleanor Vance"
+                      className="w-full bg-slate-900 text-white p-3 rounded-xl border border-slate-700"
+                    />
+                  </div>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Customer Email Address *</label>
+                    <input
+                      type="email"
+                      required
+                      value={formData.customerEmail}
+                      onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
+                      placeholder="eleanor@enterprise.com"
+                      className="w-full bg-slate-900 text-white p-3 rounded-xl border border-slate-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Customer Phone Hotline</label>
+                    <input
+                      type="text"
+                      value={formData.customerPhone || ''}
+                      onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
+                      placeholder="+1 (555) 019-2834"
+                      className="w-full bg-slate-900 text-white p-3 rounded-xl border border-slate-700 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: ROUTING & CARRIER */}
+              <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+                <h4 className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider flex items-center gap-2">
+                  <MapPin className="w-4 h-4" /> 2. Origin, Destination & Carrier Details
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Origin Location *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.origin || ''}
+                      onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
+                      placeholder="e.g. Frankfurt Cargo Hub, Germany"
+                      className="w-full bg-slate-900 text-white p-3 rounded-xl border border-slate-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Current Transit Location</label>
+                    <input
+                      type="text"
+                      value={formData.currentLocationName || ''}
+                      onChange={(e) => setFormData({ ...formData, currentLocationName: e.target.value })}
+                      placeholder="e.g. In Transit - Leipzig Terminal"
+                      className="w-full bg-slate-900 text-white p-3 rounded-xl border border-slate-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Destination Location *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.destination || ''}
+                      onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
+                      placeholder="e.g. New York JFK Terminal, USA"
+                      className="w-full bg-slate-900 text-white p-3 rounded-xl border border-slate-700"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Freight Transport Method</label>
+                    <select
+                      value={formData.shipmentType}
+                      onChange={(e) => setFormData({ ...formData, shipmentType: e.target.value as ShipmentType })}
+                      className="w-full bg-slate-900 text-white p-3 rounded-xl border border-slate-700 font-mono"
+                    >
+                      <option value="Air">Air Express Flight</option>
+                      <option value="Sea">Sea Ocean Vessel</option>
+                      <option value="Road">Ground Freight Truck</option>
+                      <option value="Express">Priority Courier</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Carrier / Courier Name</label>
+                    <input
+                      type="text"
+                      value={formData.courier || ''}
+                      onChange={(e) => setFormData({ ...formData, courier: e.target.value })}
+                      placeholder="e.g. GoTrack Express Global"
+                      className="w-full bg-slate-900 text-white p-3 rounded-xl border border-slate-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Initial Status Stage</label>
+                    <select
+                      value={formData.currentStatus || 'In Transit'}
+                      onChange={(e) => setFormData({ ...formData, currentStatus: e.target.value as ShipmentStatus })}
+                      className="w-full bg-slate-900 text-sky-400 font-bold p-3 rounded-xl border border-slate-700 font-mono"
+                    >
+                      <option value="Order Placed">Order Placed</option>
+                      <option value="Processing">Processing</option>
+                      <option value="In Transit">In Transit</option>
+                      <option value="Out for Delivery">Out for Delivery</option>
+                      <option value="Delivered">Delivered</option>
+                      <option value="On Hold / Delayed">On Hold / Delayed</option>
+                      <option value="Customs Hold">Customs Hold</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: EXPECTED TIME OF ARRIVAL (ETA) & DATES */}
+              <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+                <h4 className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider flex items-center gap-2">
+                  <Clock className="w-4 h-4" /> 3. Expected Time of Arrival (ETA) & Shipping Dates
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Dispatch / Shipping Date</label>
+                    <input
+                      type="date"
+                      value={formData.shippingDate || ''}
+                      onChange={(e) => setFormData({ ...formData, shippingDate: e.target.value })}
+                      className="w-full bg-slate-900 text-white p-3 rounded-xl border border-slate-700 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">
+                      Expected Time of Arrival (ETA) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.estimatedDelivery || ''}
+                      onChange={(e) => setFormData({ ...formData, estimatedDelivery: e.target.value })}
+                      placeholder="e.g. Aug 05, 2026 - 14:30 EST"
+                      className="w-full bg-slate-900 text-sky-300 font-mono font-bold p-3 rounded-xl border border-slate-700"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-1 block">Specify exact estimated date and time of arrival.</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">
+                      Initial Journey Progress (%): <span className="text-sky-400 font-mono">{formData.progressPercent || 15}%</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={formData.progressPercent || 15}
+                      onChange={(e) => setFormData({ ...formData, progressPercent: parseInt(e.target.value) || 0 })}
+                      className="w-full accent-sky-500 cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 4: PACKAGE & CARGO SPECIFICATIONS */}
+              <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+                <h4 className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider flex items-center gap-2">
+                  <FileText className="w-4 h-4" /> 4. Cargo Package Specifications & Details
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-slate-300 font-bold mb-1">Package Name / Cargo Specs</label>
+                    <input
+                      type="text"
+                      value={formData.packageName || ''}
+                      onChange={(e) => setFormData({ ...formData, packageName: e.target.value })}
+                      placeholder="e.g. High-Precision Microcontroller Sensors"
+                      className="w-full bg-slate-900 text-white p-3 rounded-xl border border-slate-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Total Weight</label>
+                    <input
+                      type="text"
+                      value={formData.weight || ''}
+                      onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                      placeholder="e.g. 42.5 kg"
+                      className="w-full bg-slate-900 text-white p-3 rounded-xl border border-slate-700 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Quantity / Pieces</label>
+                    <input
+                      type="text"
+                      value={formData.quantity || ''}
+                      onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                      placeholder="e.g. 12 Crates / 240 Units"
+                      className="w-full bg-slate-900 text-white p-3 rounded-xl border border-slate-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Brand Name</label>
+                    <input
+                      type="text"
+                      value={formData.brand || ''}
+                      onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                      placeholder="e.g. Schneider Electric"
+                      className="w-full bg-slate-900 text-white p-3 rounded-xl border border-slate-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Model / Reference No.</label>
+                    <input
+                      type="text"
+                      value={formData.model || ''}
+                      onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                      placeholder="e.g. MOD-8800-TX"
+                      className="w-full bg-slate-900 text-white p-3 rounded-xl border border-slate-700 font-mono"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">Customer Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.customerName}
-                    onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                    placeholder="e.g. John Smith"
-                    className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-700"
+                  <label className="block text-slate-300 font-bold mb-1">Handling Notes / Special Instructions</label>
+                  <textarea
+                    rows={2}
+                    value={formData.deliveryInstructions || ''}
+                    onChange={(e) => setFormData({ ...formData, deliveryInstructions: e.target.value })}
+                    placeholder="e.g. Keep upright. Temperature controlled 18-22C. Require adult signature upon receipt."
+                    className="w-full bg-slate-900 text-white p-3 rounded-xl border border-slate-700"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">Customer Email *</label>
-                  <input
-                    type="email"
-                    required
-                    value={formData.customerEmail}
-                    onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
-                    placeholder="john@example.com"
-                    className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-700"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">Freight Method</label>
-                  <select
-                    value={formData.shipmentType}
-                    onChange={(e) => setFormData({ ...formData, shipmentType: e.target.value as ShipmentType })}
-                    className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-700 font-mono"
-                  >
-                    <option value="Air">Air Express</option>
-                    <option value="Sea">Sea Freight</option>
-                    <option value="Road">Ground Trucking</option>
-                  </select>
-                </div>
+              {/* SECTION 5: CARGO PHOTOS */}
+              <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+                <h4 className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider flex items-center gap-2">
+                  <Upload className="w-4 h-4" /> 5. Package Photos & Waybill Documentation
+                </h4>
+                <CloudinaryUploader
+                  images={formData.images || []}
+                  onChange={(newImages) => setFormData({ ...formData, images: newImages })}
+                />
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">Package Name / Specs</label>
-                  <input
-                    type="text"
-                    value={formData.packageName}
-                    onChange={(e) => setFormData({ ...formData, packageName: e.target.value })}
-                    placeholder="e.g. Industrial Microcontrollers"
-                    className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-700"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">Destination Name</label>
-                  <input
-                    type="text"
-                    value={formData.destination}
-                    onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
-                    placeholder="e.g. San Francisco, CA, USA"
-                    className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-700"
-                  />
-                </div>
-              </div>
-
-              {/* Cloudinary Drag & Drop Image Uploader */}
-              <CloudinaryUploader
-                images={formData.images || []}
-                onChange={(newImages) => setFormData({ ...formData, images: newImages })}
-              />
 
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-5 py-2.5 bg-slate-800 text-slate-300 rounded-xl font-bold"
+                  className="px-5 py-2.5 bg-slate-800 text-slate-300 hover:text-white rounded-xl font-bold transition-colors"
                 >
                   Cancel
                 </button>
@@ -2155,11 +2385,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
                 >
                   {isSubmitting ? (
                     <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
                       <span>Dispatching & Registering...</span>
                     </>
                   ) : (
-                    <span>Create & Dispatch</span>
+                    <>
+                      <Package className="w-4 h-4" />
+                      <span>Create & Dispatch Consignment</span>
+                    </>
                   )}
                 </button>
               </div>

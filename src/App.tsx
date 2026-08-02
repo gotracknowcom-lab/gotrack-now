@@ -144,6 +144,7 @@ export default function App() {
       <AdminLogin
         onLoginSuccess={() => setCurrentTab('admin')}
         onNavigateHome={() => handleNavigate('home')}
+        logoUrl={customLogo}
       />
     );
   }
@@ -154,6 +155,7 @@ export default function App() {
       <AdminDashboard
         onLogout={() => setCurrentTab('admin_login')}
         onNavigatePublic={(tab, code) => handleNavigate(tab, code)}
+        logoUrl={customLogo}
       />
     );
   }
@@ -161,7 +163,7 @@ export default function App() {
   // Public Website Flow (Wrapped in Navigation and Footer)
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      <Navigation currentTab={currentTab} onNavigate={handleNavigate} />
+      <Navigation currentTab={currentTab} onNavigate={handleNavigate} logoUrl={customLogo} />
 
       <main className="flex-1">
         {currentTab === 'home' && <HomePage onNavigate={handleNavigate} />}
@@ -177,7 +179,7 @@ export default function App() {
         {currentTab === '404' && <NotFoundPage onNavigate={handleNavigate} />}
       </main>
 
-      <Footer onNavigate={handleNavigate} />
+      <Footer onNavigate={handleNavigate} logoUrl={customLogo} />
     </div>
   );
 }

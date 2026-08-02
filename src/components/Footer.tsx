@@ -4,9 +4,10 @@ import logoImg from '../assets/logo.png';
 
 interface FooterProps {
   onNavigate: (tab: string, trackingCode?: string) => void;
+  logoUrl?: string;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
+export const Footer: React.FC<FooterProps> = ({ onNavigate, logoUrl }) => {
   return (
     <footer className="bg-slate-950 text-slate-400 border-t border-slate-900 pt-16 pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -16,7 +17,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl overflow-hidden border border-sky-500/30 shrink-0 shadow-md bg-slate-900">
-                <img src={logoImg} alt="GoTrack Logo" className="w-full h-full object-contain p-0.5" />
+                <img src={logoUrl || logoImg} alt="GoTrack Logo" className="w-full h-full object-contain p-0.5" />
               </div>
               <span className="text-2xl font-black text-white font-mono tracking-tight">GO<span className="text-sky-400">TRACK</span></span>
             </div>
