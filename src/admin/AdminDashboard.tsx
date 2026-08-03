@@ -59,6 +59,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
   const [simSpeed, setSimSpeed] = useState<number>(1);
   const [delayReasonInput, setDelayReasonInput] = useState('');
   const [estimatedResumeInput, setEstimatedResumeInput] = useState('2:30 PM UTC');
+  const [scheduledHoldDate, setScheduledHoldDate] = useState('');
+  const [scheduledHoldTime, setScheduledHoldTime] = useState('');
+  const [scheduledHoldReason, setScheduledHoldReason] = useState('Customs inspection & security check');
   const [showCheckpointModal, setShowCheckpointModal] = useState(false);
   const [newCheckpointForm, setNewCheckpointForm] = useState({
     name: '',
@@ -73,8 +76,107 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
     if (selectedShipment) {
       setDelayReasonInput(selectedShipment.delayReason || '');
       setEstimatedResumeInput(selectedShipment.estimatedResume || '2:30 PM UTC');
+      if (selectedShipment.scheduledHold?.holdTimeWAT) {
+        const parts = selectedShipment.scheduledHold.holdTimeWAT.split('T');
+        if (parts[0]) setScheduledHoldDate(parts[0]);
+        if (parts[1]) setScheduledHoldTime(parts[1]);
+        setScheduledHoldReason(selectedShipment.scheduledHold.reason || '');
+      }
     }
   }, [selectedShipment?.id]);
+
+  // Background effect to execute scheduled holds in Nigeria Time (WAT = UTC+1)
+  useEffect(() => {
+    if (shipments.length === 0) return;
+
+    const interval = setInterval(() => {
+      // Calculate current Nigeria Time (WAT = UTC + 1 hour)
+      const nowMs = Date.now();
+      const watDate = new Date(nowMs + 3600000);
+      const currentWATISO = watDate.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:mm"
+
+      shipments.forEach((s) => {
+        if (s.scheduledHold && !s.scheduledHold.executed && s.scheduledHold.holdTimeWAT) {
+          if (currentWATISO >= s.scheduledHold.holdTimeWAT) {
+            console.log(`[Scheduled Nigeria Hold Executing] Current WAT: ${currentWATISO} >= Scheduled WAT: ${s.scheduledHold.holdTimeWAT}`);
+            const reason = s.scheduledHold.reason || 'Consignment hold for customs and security check.';
+            const updatedTimeline = (s.timeline || []).map((t) => ({ ...t, current: false }));
+            updatedTimeline.push({
+              id: 't-shold-' + Date.now(),
+              status: 'Delayed',
+              title: 'Shipment Delayed - Operational Hold',
+              location: s.currentLocationName,
+              timestamp: new Date().toLocaleString(),
+              description: reason,
+              completed: true,
+              current: true,
+            });
+
+            handleUpdateShipmentStatus(s.id, {
+              isPaused: true,
+              currentStatus: 'Delayed',
+              delayReason: reason,
+              timeline: updatedTimeline,
+              scheduledHold: { ...s.scheduledHold, executed: true },
+            }); // Sends email 'Delayed' with reason automatically!
+          }
+        }
+      });
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [shipments]);
+
+  // Background effect to auto-advance checkpoints when estimated arrival time is reached
+  useEffect(() => {
+    if (shipments.length === 0) return;
+
+    const interval = setInterval(() => {
+      const nowISO = new Date().toISOString();
+
+      shipments.forEach((s) => {
+        if (s.isPaused || s.currentStatus === 'Delayed' || s.currentStatus === 'Delivered') return;
+        const stops = s.stops || [];
+        const nextUpcomingStop = stops.find((st) => st.status === 'upcoming');
+        if (nextUpcomingStop && nextUpcomingStop.estimatedArrival) {
+          if (nextUpcomingStop.estimatedArrival.includes('T') && nowISO >= nextUpcomingStop.estimatedArrival) {
+            console.log(`[Auto Checkpoint Reached] Advancing ${s.trackingCode} to ${nextUpcomingStop.name}`);
+            const stopIdx = stops.findIndex((st) => st.id === nextUpcomingStop.id);
+            const updatedStops = stops.map((st, i) => {
+              if (i < stopIdx) return { ...st, status: 'completed' as const };
+              if (i === stopIdx) return { ...st, status: 'completed' as const };
+              if (i === stopIdx + 1) return { ...st, status: 'current' as const };
+              return st;
+            });
+
+            const calcProg = Math.round(((stopIdx + 1) / (stops.length + 1)) * 100);
+            const updatedTimeline = (s.timeline || []).map((t) => ({ ...t, current: false }));
+            updatedTimeline.push({
+              id: 't-auto-' + Date.now(),
+              status: stopIdx + 1 >= stops.length ? 'Out For Delivery' : 'Regional Hub',
+              title: `Arrived at Checkpoint: ${nextUpcomingStop.name}`,
+              location: nextUpcomingStop.name,
+              timestamp: new Date().toLocaleString(),
+              description: `Automated arrival scan completed at ${nextUpcomingStop.name}.`,
+              completed: true,
+              current: true,
+            });
+
+            handleUpdateShipmentStatus(s.id, {
+              stops: updatedStops,
+              progressPercent: calcProg,
+              currentLocationName: nextUpcomingStop.name,
+              currentCoords: [nextUpcomingStop.lng, nextUpcomingStop.lat],
+              timeline: updatedTimeline,
+              currentStatus: stopIdx + 1 >= stops.length ? 'Out For Delivery' : 'Regional Hub',
+            });
+          }
+        }
+      });
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [shipments]);
 
   // Auto-movement interval effect - guaranteed zero email dispatches on progress ticks
   useEffect(() => {
@@ -574,16 +676,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
 
     const stops = [...(selectedShipment.stops || [])];
     if (stops.length === 0) {
-      handleUpdateShipmentStatus(selectedShipment.id, { progressPercent: 100, currentStatus: 'Delivered' });
+      const updatedTimeline = (selectedShipment.timeline || []).map((t) => ({ ...t, current: false }));
+      updatedTimeline.push({
+        id: 't-del-' + Date.now(),
+        status: 'Delivered',
+        title: 'Shipment Delivered',
+        location: selectedShipment.destination,
+        timestamp: new Date().toLocaleString(),
+        description: 'Package successfully delivered to final consignee.',
+        completed: true,
+        current: true,
+      });
+
+      await handleUpdateShipmentStatus(selectedShipment.id, {
+        progressPercent: 100,
+        currentStatus: 'Delivered',
+        currentLocationName: selectedShipment.destination,
+        timeline: updatedTimeline,
+      });
+      setToastMessage(`Shipment ${selectedShipment.trackingCode} marked Delivered!`);
       return;
     }
 
     const firstIncompleteIdx = stops.findIndex((s) => s.status !== 'completed');
     if (firstIncompleteIdx === -1) {
-      handleUpdateShipmentStatus(selectedShipment.id, {
+      const updatedTimeline = (selectedShipment.timeline || []).map((t) => ({ ...t, current: false }));
+      updatedTimeline.push({
+        id: 't-del-' + Date.now(),
+        status: 'Delivered',
+        title: 'Shipment Delivered',
+        location: selectedShipment.destination,
+        timestamp: new Date().toLocaleString(),
+        description: 'All route checkpoints completed. Package delivered to destination.',
+        completed: true,
+        current: true,
+      });
+
+      await handleUpdateShipmentStatus(selectedShipment.id, {
         progressPercent: 100,
         currentStatus: 'Delivered',
         currentLocationName: selectedShipment.destination,
+        timeline: updatedTimeline,
       });
       setToastMessage(`All checkpoints completed! Shipment ${selectedShipment.trackingCode} marked Delivered.`);
       return;
@@ -592,22 +725,118 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
     stops[firstIncompleteIdx] = { ...stops[firstIncompleteIdx], status: 'completed' };
 
     let nextLocName = stops[firstIncompleteIdx].name;
-    if (firstIncompleteIdx + 1 < stops.length) {
+    const isLastStop = firstIncompleteIdx + 1 >= stops.length;
+
+    if (!isLastStop) {
       stops[firstIncompleteIdx + 1] = { ...stops[firstIncompleteIdx + 1], status: 'current' };
     } else {
       nextLocName = selectedShipment.destination;
     }
 
     const calcProgress = Math.round(((firstIncompleteIdx + 1) / (stops.length + 1)) * 100);
+    const nextStatus: ShipmentStatus = isLastStop ? 'Out For Delivery' : 'Regional Hub';
+
+    const updatedTimeline = (selectedShipment.timeline || []).map((t) => ({ ...t, current: false }));
+    updatedTimeline.push({
+      id: 't-cp-' + Date.now(),
+      status: nextStatus,
+      title: `Arrived at Checkpoint: ${stops[firstIncompleteIdx].name}`,
+      location: stops[firstIncompleteIdx].name,
+      timestamp: new Date().toLocaleString(),
+      description: `Consignment arrived at ${stops[firstIncompleteIdx].name} transit terminal.`,
+      completed: true,
+      current: true,
+    });
 
     await handleUpdateShipmentStatus(selectedShipment.id, {
       stops,
       progressPercent: calcProgress,
       currentLocationName: nextLocName,
       currentCoords: [stops[firstIncompleteIdx].lng, stops[firstIncompleteIdx].lat],
-    }, { skipEmail: true });
+      timeline: updatedTimeline,
+      currentStatus: nextStatus,
+    }); // Email sent automatically for 'Arrived at Checkpoint' / status change!
 
     setToastMessage(`Advanced ${selectedShipment.trackingCode} to Checkpoint: ${stops[firstIncompleteIdx].name} (${calcProgress}%)`);
+  };
+
+  // Resume movement from exact current location
+  const handleResumeMovement = async () => {
+    if (!selectedShipment) return;
+
+    const updatedTimeline = (selectedShipment.timeline || []).map((t) => ({ ...t, current: false }));
+    updatedTimeline.push({
+      id: 't-res-' + Date.now(),
+      status: 'International Transit',
+      title: 'Transit Resumed',
+      location: selectedShipment.currentLocationName,
+      timestamp: new Date().toLocaleString(),
+      description: 'Operational hold cleared by dispatch controller. Transit resumed along route.',
+      completed: true,
+      current: true,
+    });
+
+    await handleUpdateShipmentStatus(selectedShipment.id, {
+      isPaused: false,
+      currentStatus: 'International Transit',
+      delayReason: '',
+      scheduledHold: null,
+      timeline: updatedTimeline,
+    });
+
+    setToastMessage(`Cleared hold; shipment ${selectedShipment.trackingCode} resumed transit!`);
+  };
+
+  // Hold immediately
+  const handleHoldImmediately = async (customReason?: string) => {
+    if (!selectedShipment) return;
+    const reason = customReason || delayReasonInput || 'Consignment temporarily held at transit hub for operational inspection.';
+
+    const updatedTimeline = (selectedShipment.timeline || []).map((t) => ({ ...t, current: false }));
+    updatedTimeline.push({
+      id: 't-hold-' + Date.now(),
+      status: 'Delayed',
+      title: 'Shipment Delayed - Operational Hold',
+      location: selectedShipment.currentLocationName,
+      timestamp: new Date().toLocaleString(),
+      description: reason,
+      completed: true,
+      current: true,
+    });
+
+    await handleUpdateShipmentStatus(selectedShipment.id, {
+      isPaused: true,
+      currentStatus: 'Delayed',
+      delayReason: reason,
+      timeline: updatedTimeline,
+    });
+
+    setToastMessage(`Shipment ${selectedShipment.trackingCode} placed on immediate hold: ${reason}`);
+  };
+
+  // Schedule a Hold (Nigeria Time WAT UTC+1)
+  const handleScheduleHold = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedShipment || !scheduledHoldDate || !scheduledHoldTime) {
+      setToastMessage('Please select a date and time for Nigeria Hold Schedule (WAT UTC+1)');
+      return;
+    }
+
+    const scheduledWATString = `${scheduledHoldDate}T${scheduledHoldTime}`;
+
+    await handleUpdateShipmentStatus(
+      selectedShipment.id,
+      {
+        scheduledHold: {
+          holdTimeWAT: scheduledWATString,
+          reason: scheduledHoldReason || 'Airport Security & Customs Hold',
+          executed: false,
+        },
+      },
+      { skipEmail: true } // Internal admin schedule setting does NOT email customer until hold executes!
+    );
+
+    setToastMessage(`Hold scheduled for ${scheduledHoldDate} ${scheduledHoldTime} (Nigeria Time WAT). Internal schedule saved!`);
   };
 
   // Add Checkpoint Stop
@@ -1530,12 +1759,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
                   </div>
 
                   {/* Delay Reason & Resume Time Control Banner */}
-                  <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
-                    <h4 className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-amber-400" />
-                      Delay Reason & Resume Notice Editor
-                    </h4>
+                  <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                      <h4 className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-400" />
+                        Hold Immediately & Scheduled Hold (Nigeria Time WAT)
+                      </h4>
+                      <span className="text-[10px] text-slate-400 font-mono bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
+                        Admin Controller Only
+                      </span>
+                    </div>
 
+                    {/* Immediate Hold & Delay Notice controls */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[11px] text-slate-400 font-mono font-bold block">Delay Reason Banner Text:</label>
@@ -1562,38 +1797,92 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
                       </div>
                     </div>
 
-                    <div className="flex justify-end gap-2">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
                       <button
-                        onClick={() => {
-                          handleUpdateShipmentStatus(selectedShipment.id, {
-                            isPaused: true,
-                            currentStatus: 'Delayed',
-                            delayReason: delayReasonInput || 'Consignment hold for customs inspection.',
-                            estimatedResume: estimatedResumeInput || '2:30 PM UTC',
-                          });
-                          setToastMessage('Saved Delay Notice banner successfully!');
-                        }}
-                        className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl transition-all font-mono"
-                        id="save-delay-notice-btn"
+                        onClick={() => handleHoldImmediately()}
+                        className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl transition-all font-mono shadow-md flex items-center gap-1.5"
+                        id="hold-immediately-btn"
                       >
-                        Publish Delay Notice Banner
+                        <Pause className="w-4 h-4 fill-current" /> Hold Immediately
                       </button>
+                      
                       <button
-                        onClick={() => {
-                          handleUpdateShipmentStatus(selectedShipment.id, {
-                            isPaused: false,
-                            currentStatus: 'International Transit',
-                            delayReason: undefined,
-                            estimatedResume: undefined,
-                          });
-                          setToastMessage('Cleared delay hold; shipment resumed!');
-                        }}
-                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition-all font-mono"
-                        id="clear-delay-notice-btn"
+                        onClick={handleResumeMovement}
+                        className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl transition-all font-mono shadow-md flex items-center gap-1.5"
+                        id="resume-movement-btn"
                       >
-                        Clear Delay Hold & Resume
+                        <Play className="w-4 h-4 fill-current" /> Clear Hold & Resume Movement
                       </button>
                     </div>
+
+                    {/* Schedule a Hold (Nigeria Time WAT UTC+1) Sub-Section */}
+                    <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-3 pt-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-mono font-bold text-sky-400 uppercase flex items-center gap-1.5">
+                          <Clock className="w-4 h-4 text-sky-400" /> Schedule a Hold (Nigeria Time - WAT UTC+1)
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-mono italic">
+                          Internal schedule only; time is hidden from customers until hold executes.
+                        </span>
+                      </div>
+
+                      <form onSubmit={handleScheduleHold} className="space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label className="text-[10px] text-slate-400 font-mono block mb-1">Select Date (WAT):</label>
+                            <input
+                              type="date"
+                              value={scheduledHoldDate}
+                              onChange={(e) => setScheduledHoldDate(e.target.value)}
+                              className="w-full bg-slate-950 text-white text-xs px-3 py-2 rounded-lg border border-slate-700 font-mono"
+                              id="schedule-hold-date-input"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-slate-400 font-mono block mb-1">Select Time (WAT):</label>
+                            <input
+                              type="time"
+                              value={scheduledHoldTime}
+                              onChange={(e) => setScheduledHoldTime(e.target.value)}
+                              className="w-full bg-slate-950 text-white text-xs px-3 py-2 rounded-lg border border-slate-700 font-mono"
+                              id="schedule-hold-time-input"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-slate-400 font-mono block mb-1">Scheduled Hold Reason:</label>
+                            <input
+                              type="text"
+                              value={scheduledHoldReason}
+                              onChange={(e) => setScheduledHoldReason(e.target.value)}
+                              placeholder="e.g. Scheduled Customs Verification"
+                              className="w-full bg-slate-950 text-white text-xs px-3 py-2 rounded-lg border border-slate-700 font-mono"
+                              id="schedule-hold-reason-input"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1">
+                          {selectedShipment?.scheduledHold?.holdTimeWAT ? (
+                            <span className="text-[11px] font-mono text-amber-300">
+                              Active Scheduled Hold: {selectedShipment.scheduledHold.holdTimeWAT.replace('T', ' ')} (WAT) - {selectedShipment.scheduledHold.executed ? 'Executed' : 'Pending'}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-mono text-slate-500">No scheduled hold active.</span>
+                          )}
+
+                          <button
+                            type="submit"
+                            className="px-4 py-2 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs rounded-xl font-mono transition-colors"
+                            id="save-scheduled-hold-btn"
+                          >
+                            Set Scheduled Hold
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+
                   </div>
 
                   {/* Route Checkpoint Waypoints List & Editor */}

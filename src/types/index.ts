@@ -69,6 +69,11 @@ export interface Shipment {
   isPaused: boolean;
   delayReason?: string;
   estimatedResume?: string;
+  scheduledHold?: {
+    holdTimeWAT: string; // ISO string or format e.g. "2026-08-03T18:00"
+    reason: string;
+    executed?: boolean;
+  } | null;
   movementSpeed?: number;
   isArchived?: boolean;
   createdAt: string;

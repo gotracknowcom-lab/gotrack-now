@@ -17,6 +17,21 @@ interface MapComponentProps {
   onAdvanceNextCheckpoint?: () => void;
 }
 
+// Haversine distance calculation in km between two [lng, lat] coordinates
+function calculateDistance(start: [number, number], end: [number, number]): number {
+  const R = 6371; // Earth radius in km
+  const dLat = ((end[1] - start[1]) * Math.PI) / 180;
+  const dLng = ((end[0] - start[0]) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((start[1] * Math.PI) / 180) *
+      Math.cos((end[1] * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 // Calculate bearing angle (heading 0-360 deg) between two [lng, lat] coordinates
 function calculateBearing(start: [number, number], end: [number, number]): number {
   const startLngRad = (start[0] * Math.PI) / 180;
@@ -99,25 +114,48 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     return coords;
   };
 
-  // Compute interpolated point [lng, lat] and heading angle along path based on progressPercent (0 to 100)
+  // Compute interpolated point [lng, lat] and heading angle along path based on progressPercent (0 to 100) using exact cumulative distance
   const calculatePositionAndHeading = (progressPercent: number): { pos: [number, number]; heading: number } => {
     const route = getRouteCoordinates();
     if (route.length <= 1) return { pos: route[0] || [0, 0], heading: 0 };
 
     const clampedProgress = Math.max(0, Math.min(100, progressPercent));
-    const numSegments = route.length - 1;
-    const normalized = (clampedProgress / 100) * numSegments;
-    const segmentIndex = Math.min(Math.floor(normalized), numSegments - 1);
-    const segmentRatio = normalized - segmentIndex;
+    if (clampedProgress <= 0) return { pos: route[0], heading: calculateBearing(route[0], route[1] || route[0]) };
+    if (clampedProgress >= 100) return { pos: route[route.length - 1], heading: calculateBearing(route[route.length - 2] || route[0], route[route.length - 1]) };
 
-    const p1 = route[segmentIndex];
-    const p2 = route[segmentIndex + 1];
+    // Calculate segment distances
+    const segmentDistances: number[] = [];
+    let totalDistance = 0;
+    for (let i = 0; i < route.length - 1; i++) {
+      const dist = calculateDistance(route[i], route[i + 1]);
+      const validDist = dist > 0 ? dist : 0.0001;
+      segmentDistances.push(validDist);
+      totalDistance += validDist;
+    }
 
-    const lng = p1[0] + (p2[0] - p1[0]) * segmentRatio;
-    const lat = p1[1] + (p2[1] - p1[1]) * segmentRatio;
-    const heading = calculateBearing(p1, p2);
+    if (totalDistance === 0) return { pos: route[0], heading: 0 };
 
-    return { pos: [lng, lat], heading };
+    const targetDistance = (clampedProgress / 100) * totalDistance;
+    let accumulated = 0;
+
+    for (let i = 0; i < segmentDistances.length; i++) {
+      const segDist = segmentDistances[i];
+      if (accumulated + segDist >= targetDistance || i === segmentDistances.length - 1) {
+        const remaining = targetDistance - accumulated;
+        const ratio = Math.max(0, Math.min(1, segDist > 0 ? remaining / segDist : 0));
+        const p1 = route[i];
+        const p2 = route[i + 1];
+
+        const lng = p1[0] + (p2[0] - p1[0]) * ratio;
+        const lat = p1[1] + (p2[1] - p1[1]) * ratio;
+        const heading = calculateBearing(p1, p2);
+
+        return { pos: [lng, lat], heading };
+      }
+      accumulated += segDist;
+    }
+
+    return { pos: route[route.length - 1], heading: 0 };
   };
 
   // Synchronize internal animated progress state when shipment prop changes
@@ -462,9 +500,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
       }`}
     >
       {/* Top Overlay Logistics Banner */}
-      <div className="absolute top-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 backdrop-blur-md p-3.5 rounded-2xl border border-slate-800/80 text-white shadow-xl">
-        <div className="flex items-center gap-3">
-          <div className={`p-2.5 rounded-xl border ${
+      <div className="absolute top-2 left-2 right-2 sm:top-4 sm:left-4 sm:right-4 z-10 flex flex-wrap items-center justify-between gap-2 sm:gap-3 bg-slate-900/90 backdrop-blur-md p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-800/80 text-white shadow-xl">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className={`p-2 sm:p-2.5 rounded-xl border ${
             isPausedOrHalted
               ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
               : 'bg-sky-500/20 text-sky-400 border-sky-500/40'
@@ -587,7 +625,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
       {/* Map Container Element */}
       <div
         ref={mapContainerRef}
-        className={`w-full ${isFullscreen ? 'h-screen' : 'h-[480px] sm:h-[550px]'}`}
+        className={`w-full ${isFullscreen ? 'h-screen' : 'h-[420px] sm:h-[500px] md:h-[550px]'}`}
         id="live-gps-map-canvas"
       />
 
