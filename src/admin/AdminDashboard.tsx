@@ -62,6 +62,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
   const [scheduledHoldDate, setScheduledHoldDate] = useState('');
   const [scheduledHoldTime, setScheduledHoldTime] = useState('');
   const [scheduledHoldReason, setScheduledHoldReason] = useState('Customs inspection & security check');
+  const [scheduledHoldCheckpointId, setScheduledHoldCheckpointId] = useState('');
   const [showCheckpointModal, setShowCheckpointModal] = useState(false);
   const [newCheckpointForm, setNewCheckpointForm] = useState({
     name: '',
@@ -81,6 +82,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
         if (parts[0]) setScheduledHoldDate(parts[0]);
         if (parts[1]) setScheduledHoldTime(parts[1]);
         setScheduledHoldReason(selectedShipment.scheduledHold.reason || '');
+        setScheduledHoldCheckpointId(selectedShipment.scheduledHold.targetCheckpointId || '');
+      } else {
+        setScheduledHoldDate('');
+        setScheduledHoldTime('');
+        setScheduledHoldCheckpointId('');
       }
     }
   }, [selectedShipment?.id]);
@@ -100,12 +106,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
           if (currentWATISO >= s.scheduledHold.holdTimeWAT) {
             console.log(`[Scheduled Nigeria Hold Executing] Current WAT: ${currentWATISO} >= Scheduled WAT: ${s.scheduledHold.holdTimeWAT}`);
             const reason = s.scheduledHold.reason || 'Consignment hold for customs and security check.';
+            
+            let newLocation = s.currentLocationName;
+            let newCoords = s.currentCoords;
+            let updatedStops = s.stops || [];
+            let updatedProgress = s.progressPercent;
+
+            // If target checkpoint was chosen, move shipment to that checkpoint!
+            if (s.scheduledHold.targetCheckpointId) {
+              const targetIdx = updatedStops.findIndex((st) => st.id === s.scheduledHold?.targetCheckpointId);
+              if (targetIdx !== -1) {
+                const targetStop = updatedStops[targetIdx];
+                newLocation = targetStop.name;
+                newCoords = [targetStop.lng, targetStop.lat];
+                updatedStops = updatedStops.map((st, i) => {
+                  if (i <= targetIdx) return { ...st, status: 'completed' as const };
+                  if (i === targetIdx + 1) return { ...st, status: 'current' as const };
+                  return st;
+                });
+                updatedProgress = Math.round(((targetIdx + 1) / (updatedStops.length + 1)) * 100);
+              }
+            }
+
             const updatedTimeline = (s.timeline || []).map((t) => ({ ...t, current: false }));
             updatedTimeline.push({
               id: 't-shold-' + Date.now(),
               status: 'Delayed',
-              title: 'Shipment Delayed - Operational Hold',
-              location: s.currentLocationName,
+              title: s.scheduledHold.targetCheckpointName
+                ? `Arrived at Checkpoint & Held: ${s.scheduledHold.targetCheckpointName}`
+                : 'Shipment Delayed - Operational Hold',
+              location: newLocation,
               timestamp: new Date().toLocaleString(),
               description: reason,
               completed: true,
@@ -116,6 +146,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
               isPaused: true,
               currentStatus: 'Delayed',
               delayReason: reason,
+              currentLocationName: newLocation,
+              currentCoords: newCoords,
+              stops: updatedStops,
+              progressPercent: updatedProgress,
               timeline: updatedTimeline,
               scheduledHold: { ...s.scheduledHold, executed: true },
             }); // Sends email 'Delayed' with reason automatically!
@@ -823,6 +857,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
     }
 
     const scheduledWATString = `${scheduledHoldDate}T${scheduledHoldTime}`;
+    const targetStop = selectedShipment.stops?.find((s) => s.id === scheduledHoldCheckpointId);
 
     await handleUpdateShipmentStatus(
       selectedShipment.id,
@@ -830,13 +865,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
         scheduledHold: {
           holdTimeWAT: scheduledWATString,
           reason: scheduledHoldReason || 'Airport Security & Customs Hold',
+          targetCheckpointId: scheduledHoldCheckpointId || undefined,
+          targetCheckpointName: targetStop?.name || undefined,
           executed: false,
         },
       },
       { skipEmail: true } // Internal admin schedule setting does NOT email customer until hold executes!
     );
 
-    setToastMessage(`Hold scheduled for ${scheduledHoldDate} ${scheduledHoldTime} (Nigeria Time WAT). Internal schedule saved!`);
+    setToastMessage(
+      `Hold scheduled for ${scheduledHoldDate} ${scheduledHoldTime} (Nigeria Time WAT)${
+        targetStop ? ` at Checkpoint: ${targetStop.name}` : ''
+      }. Internal schedule saved!`
+    );
+  };
+
+  // Delete / Cancel Scheduled Hold
+  const handleDeleteScheduledHold = async () => {
+    if (!selectedShipment) return;
+    await handleUpdateShipmentStatus(
+      selectedShipment.id,
+      { scheduledHold: null },
+      { skipEmail: true }
+    );
+    setScheduledHoldDate('');
+    setScheduledHoldTime('');
+    setScheduledHoldReason('Customs inspection & security check');
+    setScheduledHoldCheckpointId('');
+    setToastMessage(`Cancelled and removed scheduled hold for ${selectedShipment.trackingCode}`);
   };
 
   // Add Checkpoint Stop
@@ -1816,69 +1872,151 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onNavi
                     </div>
 
                     {/* Schedule a Hold (Nigeria Time WAT UTC+1) Sub-Section */}
-                    <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-3 pt-4">
-                      <div className="flex items-center justify-between">
+                    <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-4 pt-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
                         <span className="text-xs font-mono font-bold text-sky-400 uppercase flex items-center gap-1.5">
-                          <Clock className="w-4 h-4 text-sky-400" /> Schedule a Hold (Nigeria Time - WAT UTC+1)
+                          <Clock className="w-4 h-4 text-sky-400" /> Schedule an Automated Hold (Nigeria Time - WAT UTC+1)
                         </span>
                         <span className="text-[10px] text-slate-500 font-mono italic">
-                          Internal schedule only; time is hidden from customers until hold executes.
+                          Internal schedule only; time is hidden from customers until hold triggers.
                         </span>
                       </div>
 
+                      {/* Active Scheduled Hold Info Card (View/Edit/Delete) */}
+                      {selectedShipment?.scheduledHold?.holdTimeWAT && (
+                        <div className="bg-slate-950 p-3.5 rounded-xl border border-amber-500/30 flex flex-wrap items-center justify-between gap-3 shadow-inner">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-mono font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                                <AlertTriangle className="w-3.5 h-3.5" /> Active Scheduled Hold:
+                              </span>
+                              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                                selectedShipment.scheduledHold.executed
+                                  ? 'bg-slate-800 text-slate-400'
+                                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse'
+                              }`}>
+                                {selectedShipment.scheduledHold.executed ? 'EXECUTED' : 'PENDING SCHEDULE'}
+                              </span>
+                            </div>
+
+                            <div className="text-xs font-mono text-slate-200 flex flex-wrap items-center gap-x-4 gap-y-1 pt-0.5">
+                              <span><strong>Time (WAT):</strong> {selectedShipment.scheduledHold.holdTimeWAT.replace('T', ' ')}</span>
+                              <span><strong>Location:</strong> {selectedShipment.scheduledHold.targetCheckpointName || 'Current Location'}</span>
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-mono">
+                              <strong>Reason:</strong> {selectedShipment.scheduledHold.reason || 'Customs & security check'}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (selectedShipment.scheduledHold?.holdTimeWAT) {
+                                  const parts = selectedShipment.scheduledHold.holdTimeWAT.split('T');
+                                  if (parts[0]) setScheduledHoldDate(parts[0]);
+                                  if (parts[1]) setScheduledHoldTime(parts[1]);
+                                  setScheduledHoldReason(selectedShipment.scheduledHold.reason || '');
+                                  setScheduledHoldCheckpointId(selectedShipment.scheduledHold.targetCheckpointId || '');
+                                  setToastMessage('Schedule loaded into form for editing.');
+                                }
+                              }}
+                              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-sky-400 font-mono font-bold text-[11px] rounded-lg border border-slate-700 transition-colors"
+                              id="edit-active-scheduled-hold-btn"
+                            >
+                              Edit Schedule
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleDeleteScheduledHold}
+                              className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 font-mono font-bold text-[11px] rounded-lg border border-rose-500/40 transition-colors flex items-center gap-1"
+                              id="delete-active-scheduled-hold-btn"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Delete / Cancel Schedule
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       <form onSubmit={handleScheduleHold} className="space-y-3">
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                           <div>
-                            <label className="text-[10px] text-slate-400 font-mono block mb-1">Select Date (WAT):</label>
+                            <label className="text-[10px] text-slate-400 font-mono block mb-1">Date (Nigeria WAT):</label>
                             <input
                               type="date"
                               value={scheduledHoldDate}
                               onChange={(e) => setScheduledHoldDate(e.target.value)}
-                              className="w-full bg-slate-950 text-white text-xs px-3 py-2 rounded-lg border border-slate-700 font-mono"
+                              className="w-full bg-slate-950 text-white text-xs px-3 py-2 rounded-lg border border-slate-700 font-mono focus:border-sky-400"
                               id="schedule-hold-date-input"
                             />
                           </div>
 
                           <div>
-                            <label className="text-[10px] text-slate-400 font-mono block mb-1">Select Time (WAT):</label>
+                            <label className="text-[10px] text-slate-400 font-mono block mb-1">Time (Nigeria WAT):</label>
                             <input
                               type="time"
                               value={scheduledHoldTime}
                               onChange={(e) => setScheduledHoldTime(e.target.value)}
-                              className="w-full bg-slate-950 text-white text-xs px-3 py-2 rounded-lg border border-slate-700 font-mono"
+                              className="w-full bg-slate-950 text-white text-xs px-3 py-2 rounded-lg border border-slate-700 font-mono focus:border-sky-400"
                               id="schedule-hold-time-input"
                             />
                           </div>
 
                           <div>
-                            <label className="text-[10px] text-slate-400 font-mono block mb-1">Scheduled Hold Reason:</label>
+                            <label className="text-[10px] text-slate-400 font-mono block mb-1">Target Checkpoint (Optional):</label>
+                            <select
+                              value={scheduledHoldCheckpointId}
+                              onChange={(e) => setScheduledHoldCheckpointId(e.target.value)}
+                              className="w-full bg-slate-950 text-white text-xs px-3 py-2 rounded-lg border border-slate-700 font-mono focus:border-sky-400"
+                              id="schedule-hold-checkpoint-select"
+                            >
+                              <option value="">Hold at Current Location</option>
+                              {selectedShipment.stops?.map((stop, sIdx) => (
+                                <option key={stop.id} value={stop.id}>
+                                  Stop #{sIdx + 1}: {stop.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-slate-400 font-mono block mb-1">Hold Reason Notice:</label>
                             <input
                               type="text"
                               value={scheduledHoldReason}
                               onChange={(e) => setScheduledHoldReason(e.target.value)}
                               placeholder="e.g. Scheduled Customs Verification"
-                              className="w-full bg-slate-950 text-white text-xs px-3 py-2 rounded-lg border border-slate-700 font-mono"
+                              className="w-full bg-slate-950 text-white text-xs px-3 py-2 rounded-lg border border-slate-700 font-mono focus:border-sky-400"
                               id="schedule-hold-reason-input"
                             />
                           </div>
                         </div>
 
                         <div className="flex items-center justify-between pt-1">
-                          {selectedShipment?.scheduledHold?.holdTimeWAT ? (
-                            <span className="text-[11px] font-mono text-amber-300">
-                              Active Scheduled Hold: {selectedShipment.scheduledHold.holdTimeWAT.replace('T', ' ')} (WAT) - {selectedShipment.scheduledHold.executed ? 'Executed' : 'Pending'}
-                            </span>
-                          ) : (
-                            <span className="text-[11px] font-mono text-slate-500">No scheduled hold active.</span>
-                          )}
+                          <span className="text-[11px] font-mono text-slate-400">
+                            {selectedShipment?.scheduledHold
+                              ? 'Modify schedule details above and click Save Schedule.'
+                              : 'Set WAT trigger time and optional target checkpoint.'}
+                          </span>
 
-                          <button
-                            type="submit"
-                            className="px-4 py-2 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs rounded-xl font-mono transition-colors"
-                            id="save-scheduled-hold-btn"
-                          >
-                            Set Scheduled Hold
-                          </button>
+                          <div className="flex items-center gap-2">
+                            {selectedShipment?.scheduledHold && (
+                              <button
+                                type="button"
+                                onClick={handleDeleteScheduledHold}
+                                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-rose-400 font-bold text-xs rounded-xl font-mono transition-colors"
+                              >
+                                Cancel Schedule
+                              </button>
+                            )}
+                            <button
+                              type="submit"
+                              className="px-4 py-2 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs rounded-xl font-mono transition-colors shadow-md"
+                              id="save-scheduled-hold-btn"
+                            >
+                              {selectedShipment?.scheduledHold ? 'Update Scheduled Hold' : 'Save Scheduled Hold'}
+                            </button>
+                          </div>
                         </div>
                       </form>
                     </div>

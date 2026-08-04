@@ -72,6 +72,8 @@ export interface Shipment {
   scheduledHold?: {
     holdTimeWAT: string; // ISO string or format e.g. "2026-08-03T18:00"
     reason: string;
+    targetCheckpointId?: string;
+    targetCheckpointName?: string;
     executed?: boolean;
   } | null;
   movementSpeed?: number;

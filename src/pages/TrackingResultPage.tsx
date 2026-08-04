@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { Shipment } from '../types';
+import { sendShipmentStatusEmail } from '../lib/emailService';
 import { MapComponent } from '../components/MapComponent';
 import { ShipmentTimeline } from '../components/ShipmentTimeline';
 import { LiveChatWidget } from '../components/LiveChatWidget';
@@ -92,6 +93,73 @@ export const TrackingResultPage: React.FC<TrackingResultPageProps> = ({
       unsubscribe();
     };
   }, [activeCode]);
+
+  // Check and execute scheduled holds or automated checkpoint arrivals on page view / listener
+  useEffect(() => {
+    if (!shipment || !shipment.id) return;
+
+    // 1. Check Nigeria Time WAT Scheduled Hold
+    if (shipment.scheduledHold && !shipment.scheduledHold.executed && shipment.scheduledHold.holdTimeWAT) {
+      const nowMs = Date.now();
+      const watDate = new Date(nowMs + 3600000);
+      const currentWATISO = watDate.toISOString().slice(0, 16);
+
+      if (currentWATISO >= shipment.scheduledHold.holdTimeWAT) {
+        console.log(`[Tracking Page WAT Hold Triggered] Current WAT: ${currentWATISO}`);
+        const reason = shipment.scheduledHold.reason || 'Consignment hold for customs and security check.';
+        
+        let newLocation = shipment.currentLocationName;
+        let newCoords = shipment.currentCoords;
+        let updatedStops = shipment.stops || [];
+        let updatedProgress = shipment.progressPercent;
+
+        if (shipment.scheduledHold.targetCheckpointId) {
+          const targetIdx = updatedStops.findIndex((st) => st.id === shipment.scheduledHold?.targetCheckpointId);
+          if (targetIdx !== -1) {
+            const targetStop = updatedStops[targetIdx];
+            newLocation = targetStop.name;
+            newCoords = [targetStop.lng, targetStop.lat];
+            updatedStops = updatedStops.map((st, i) => {
+              if (i <= targetIdx) return { ...st, status: 'completed' as const };
+              if (i === targetIdx + 1) return { ...st, status: 'current' as const };
+              return st;
+            });
+            updatedProgress = Math.round(((targetIdx + 1) / (updatedStops.length + 1)) * 100);
+          }
+        }
+
+        const updatedTimeline = (shipment.timeline || []).map((t) => ({ ...t, current: false }));
+        updatedTimeline.push({
+          id: 't-shold-' + Date.now(),
+          status: 'Delayed',
+          title: shipment.scheduledHold.targetCheckpointName
+            ? `Arrived at Checkpoint & Held: ${shipment.scheduledHold.targetCheckpointName}`
+            : 'Shipment Delayed - Operational Hold',
+          location: newLocation,
+          timestamp: new Date().toLocaleString(),
+          description: reason,
+          completed: true,
+          current: true,
+        });
+
+        const updatePayload = {
+          isPaused: true,
+          currentStatus: 'Delayed',
+          delayReason: reason,
+          currentLocationName: newLocation,
+          currentCoords: newCoords,
+          stops: updatedStops,
+          progressPercent: updatedProgress,
+          timeline: updatedTimeline,
+          scheduledHold: { ...shipment.scheduledHold, executed: true },
+        };
+
+        const docRef = doc(db, 'shipments', shipment.id);
+        updateDoc(docRef, updatePayload).catch((err) => console.error('Failed to update scheduled hold:', err));
+        sendShipmentStatusEmail({ ...shipment, ...updatePayload }, 'Delayed', reason).catch(() => {});
+      }
+    }
+  }, [shipment]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();

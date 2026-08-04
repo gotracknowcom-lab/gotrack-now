@@ -158,32 +158,23 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     return { pos: route[route.length - 1], heading: 0 };
   };
 
-  // Synchronize internal animated progress state when shipment prop changes
+  // Synchronize internal animated progress state smoothly towards target shipment.progressPercent
   useEffect(() => {
-    setAnimatedProgress(shipment.progressPercent || 0);
-  }, [shipment.progressPercent]);
-
-  // Smooth 60 FPS animation loop for micro-motion along route
-  useEffect(() => {
-    const isPausedState = shipment.isPaused || shipment.currentStatus === 'Paused' || shipment.currentStatus === 'Delayed' || shipment.currentStatus === 'Delivered';
-    if (isPausedState) return;
+    const target = shipment.progressPercent || 0;
 
     let frameId: number;
-    let startTime = performance.now();
-
-    const animate = (time: number) => {
-      const elapsed = (time - startTime) / 1000;
-      // Slight smooth oscillation around progress to reflect live satellite GPS ping activity
-      const microDelta = Math.sin(elapsed * 1.5) * 0.25;
-      const currentSimulatedProgress = Math.max(0, Math.min(100, (shipment.progressPercent || 0) + microDelta));
-
-      setAnimatedProgress(currentSimulatedProgress);
+    const animate = () => {
+      setAnimatedProgress((prev) => {
+        const diff = target - prev;
+        if (Math.abs(diff) < 0.05) return target;
+        return prev + diff * 0.08; // Smooth linear forward interpolation towards target progress
+      });
       frameId = requestAnimationFrame(animate);
     };
 
     frameId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frameId);
-  }, [shipment.progressPercent, shipment.isPaused, shipment.currentStatus]);
+  }, [shipment.progressPercent]);
 
   // Initialize MapLibre GL map with guaranteed raster tile style & ResizeObserver
   useEffect(() => {
