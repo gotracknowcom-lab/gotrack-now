@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
-import * as maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
-import { Shipment, ShipmentType } from '../types';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { Shipment } from '../types';
 import {
-  Plane, Truck, Ship, Package, MapPin, Navigation, Play, Pause, AlertTriangle,
-  CheckCircle2, Sun, Moon, Maximize2, Minimize2, ZoomIn, ZoomOut, FastForward,
-  RotateCcw, ShieldAlert, Clock
+  Plane, Truck, Ship, Package, Navigation, Play, Pause,
+  Layers, RotateCcw, ZoomIn, ZoomOut, Maximize2, Minimize2,
+  ShieldAlert, Clock, Compass, Radio, Activity
 } from 'lucide-react';
 
 interface MapComponentProps {
@@ -17,9 +17,9 @@ interface MapComponentProps {
   onAdvanceNextCheckpoint?: () => void;
 }
 
-// Haversine distance calculation in km between two [lng, lat] coordinates
-function calculateDistance(start: [number, number], end: [number, number]): number {
-  const R = 6371; // Earth radius in km
+// Haversine distance in km between [lng, lat] coords
+function haversineDistance(start: [number, number], end: [number, number]): number {
+  const R = 6371;
   const dLat = ((end[1] - start[1]) * Math.PI) / 180;
   const dLng = ((end[0] - start[0]) * Math.PI) / 180;
   const a =
@@ -28,54 +28,107 @@ function calculateDistance(start: [number, number], end: [number, number]): numb
       Math.cos((end[1] * Math.PI) / 180) *
       Math.sin(dLng / 2) *
       Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Calculate bearing angle (heading 0-360 deg) between two [lng, lat] coordinates
+// Bearing angle in degrees (0-360) between [lng, lat] coords (0 = North, 90 = East, 180 = South, 270 = West)
 function calculateBearing(start: [number, number], end: [number, number]): number {
-  const startLngRad = (start[0] * Math.PI) / 180;
-  const startLatRad = (start[1] * Math.PI) / 180;
-  const endLngRad = (end[0] * Math.PI) / 180;
-  const endLatRad = (end[1] * Math.PI) / 180;
-
-  const dLng = endLngRad - startLngRad;
-  const y = Math.sin(dLng) * Math.cos(endLatRad);
-  const x = Math.cos(startLatRad) * Math.sin(endLatRad) - Math.sin(startLatRad) * Math.cos(endLatRad) * Math.cos(dLng);
+  const startLng = (start[0] * Math.PI) / 180;
+  const startLat = (start[1] * Math.PI) / 180;
+  const endLng = (end[0] * Math.PI) / 180;
+  const endLat = (end[1] * Math.PI) / 180;
+  const dLng = endLng - startLng;
+  const y = Math.sin(dLng) * Math.cos(endLat);
+  const x = Math.cos(startLat) * Math.sin(endLat) - Math.sin(startLat) * Math.cos(endLat) * Math.cos(dLng);
   const brng = (Math.atan2(y, x) * 180) / Math.PI;
   return (brng + 360) % 360;
 }
 
-// Built-in raster style generator so map always renders instantly regardless of vector JSON handshakes or network blocks
-const getRasterStyle = (theme: 'dark' | 'light'): maplibregl.StyleSpecification => {
-  const tileUrl = theme === 'dark'
-    ? 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-    : 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png';
+// High-precision spherical great circle curve generator for pixel-perfect flight paths
+function generateCurvedPoints(
+  p1: [number, number],
+  p2: [number, number],
+  numPoints: number = 60
+): [number, number][] {
+  const points: [number, number][] = [];
+  const startLng = (p1[0] * Math.PI) / 180;
+  const startLat = (p1[1] * Math.PI) / 180;
+  const endLng = (p2[0] * Math.PI) / 180;
+  const endLat = (p2[1] * Math.PI) / 180;
 
-  return {
-    version: 8,
-    sources: {
-      'carto-tiles': {
-        type: 'raster',
-        tiles: [
-          tileUrl,
-          tileUrl.replace('a.basemaps', 'b.basemaps'),
-          tileUrl.replace('a.basemaps', 'c.basemaps'),
-        ],
-        tileSize: 256,
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-      },
-    },
-    layers: [
-      {
-        id: 'carto-basemap-layer',
-        type: 'raster',
-        source: 'carto-tiles',
-        minzoom: 0,
-        maxzoom: 19,
-      },
-    ],
-  };
+  const d =
+    2 *
+    Math.asin(
+      Math.sqrt(
+        Math.pow(Math.sin((startLat - endLat) / 2), 2) +
+          Math.cos(startLat) *
+            Math.cos(endLat) *
+            Math.pow(Math.sin((startLng - endLng) / 2), 2)
+      )
+    );
+
+  if (d === 0 || isNaN(d)) return [p1, p2];
+
+  for (let i = 0; i <= numPoints; i++) {
+    const f = i / numPoints;
+    const A = Math.sin((1 - f) * d) / Math.sin(d);
+    const B = Math.sin(f * d) / Math.sin(d);
+    const x = A * Math.cos(startLat) * Math.cos(startLng) + B * Math.cos(endLat) * Math.cos(endLng);
+    const y = A * Math.cos(startLat) * Math.sin(startLng) + B * Math.cos(endLat) * Math.sin(endLng);
+    const z = A * Math.sin(startLat) + B * Math.sin(endLat);
+    const lat = Math.atan2(z, Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2)));
+    const lng = Math.atan2(y, x);
+    points.push([(lng * 180) / Math.PI, (lat * 180) / Math.PI]);
+  }
+  return points;
+}
+
+// Angular slerp helper for smooth shortest-angle rotation
+function lerpAngle(current: number, target: number, t: number): number {
+  const diff = ((target - current + 540) % 360) - 180;
+  return (current + diff * t + 360) % 360;
+}
+
+type MapTheme = 'dark' | 'satellite' | 'streets' | 'terrain';
+
+interface TileConfig {
+  url: string;
+  subdomains: string;
+  maxZoom: number;
+  label: string;
+  attribution: string;
+}
+
+// Zero-API-key, zero-watermark public basemap providers
+const TILE_PROVIDERS: Record<MapTheme, TileConfig> = {
+  dark: {
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    subdomains: 'abc',
+    maxZoom: 19,
+    label: 'Radar Dark',
+    attribution: '&copy; OpenStreetMap contributors',
+  },
+  satellite: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    subdomains: '',
+    maxZoom: 19,
+    label: 'Satellite',
+    attribution: '&copy; Esri, Maxar, Earthstar Geographics',
+  },
+  streets: {
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    subdomains: 'abc',
+    maxZoom: 19,
+    label: 'Streets',
+    attribution: '&copy; OpenStreetMap contributors',
+  },
+  terrain: {
+    url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+    subdomains: 'abc',
+    maxZoom: 19,
+    label: 'Terrain',
+    attribution: '&copy; OpenStreetMap contributors, HOT',
+  },
 };
 
 export const MapComponent: React.FC<MapComponentProps> = ({
@@ -83,405 +136,695 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   isAdminControl = false,
   onUpdateProgress,
   onTogglePause,
-  onSetDelayReason,
   onAdvanceNextCheckpoint,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-  const vehicleMarkerRef = useRef<maplibregl.Marker | null>(null);
-  const vehicleInnerElRef = useRef<HTMLDivElement | null>(null);
-  const originMarkerRef = useRef<maplibregl.Marker | null>(null);
-  const destMarkerRef = useRef<maplibregl.Marker | null>(null);
-  const stopMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const mapElementRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
 
-  const [mapLoaded, setMapLoaded] = useState(false);
-  const [mapTheme, setMapTheme] = useState<'dark' | 'light'>('dark');
+  // Markers and Polylines
+  const vehicleMarkerRef = useRef<L.Marker | null>(null);
+  const originMarkerRef = useRef<L.Marker | null>(null);
+  const destMarkerRef = useRef<L.Marker | null>(null);
+  const checkpointMarkersRef = useRef<L.Marker[]>([]);
+  
+  // Polyline layers: Traveled (solid neon) and Projected (tactical dashed)
+  const traveledLineRef = useRef<L.Polyline | null>(null);
+  const traveledCasingRef = useRef<L.Polyline | null>(null);
+  const projectedLineRef = useRef<L.Polyline | null>(null);
+
+  const [mapTheme, setMapTheme] = useState<MapTheme>('dark');
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [animatedProgress, setAnimatedProgress] = useState(shipment.progressPercent || 0);
+  const [mapReady, setMapReady] = useState(false);
+  const [isLiveCruising, setIsLiveCruising] = useState(true);
+  const [isSimulatingFlight, setIsSimulatingFlight] = useState(false);
 
-  // Compute full coordinate path from origin -> stops -> destination
-  const getRouteCoordinates = (): [number, number][] => {
-    const coords: [number, number][] = [shipment.originCoords];
+  // Internal smooth progress (0-100) and heading angle (0-360)
+  const currentProgressRef = useRef<number>(shipment.progressPercent || 0);
+  const targetProgressRef = useRef<number>(shipment.progressPercent || 0);
+  const currentHeadingRef = useRef<number>(0);
+  const [displayProgress, setDisplayProgress] = useState<number>(shipment.progressPercent || 0);
+
+  // Sync target progress with shipment prop
+  useEffect(() => {
+    if (!isSimulatingFlight) {
+      targetProgressRef.current = Math.max(0, Math.min(100, shipment.progressPercent || 0));
+    }
+  }, [shipment.progressPercent, isSimulatingFlight]);
+
+  // Normalize full route waypoints: Origin -> Stops -> Destination
+  const waypoints = useMemo<[number, number][]>(() => {
+    const list: [number, number][] = [];
+    if (shipment.originCoords && shipment.originCoords.length === 2) {
+      list.push(shipment.originCoords);
+    }
     if (shipment.stops && shipment.stops.length > 0) {
-      shipment.stops.forEach((stop) => {
-        if (typeof stop.lng === 'number' && typeof stop.lat === 'number') {
-          coords.push([stop.lng, stop.lat]);
+      shipment.stops.forEach((s) => {
+        if (typeof s.lng === 'number' && typeof s.lat === 'number') {
+          list.push([s.lng, s.lat]);
         }
       });
     }
-    coords.push(shipment.destinationCoords);
-    return coords;
-  };
+    if (shipment.destinationCoords && shipment.destinationCoords.length === 2) {
+      list.push(shipment.destinationCoords);
+    }
+    return list.length >= 2 ? list : [[-73.7781, 40.6413], [-122.4194, 37.7749]];
+  }, [shipment.originCoords, shipment.destinationCoords, shipment.stops]);
 
-  // Compute interpolated point [lng, lat] and heading angle along path based on progressPercent (0 to 100) using exact cumulative distance
-  const calculatePositionAndHeading = (progressPercent: number): { pos: [number, number]; heading: number } => {
-    const route = getRouteCoordinates();
-    if (route.length <= 1) return { pos: route[0] || [0, 0], heading: 0 };
+  // Generate high-density interpolated route path for buttery-smooth vehicle movement
+  const detailedPath = useMemo<[number, number][]>(() => {
+    const fullPath: [number, number][] = [];
+    for (let i = 0; i < waypoints.length - 1; i++) {
+      const p1 = waypoints[i];
+      const p2 = waypoints[i + 1];
+      const arc = shipment.shipmentType === 'Air'
+        ? generateCurvedPoints(p1, p2, 60)
+        : shipment.shipmentType === 'Sea'
+        ? generateCurvedPoints(p1, p2, 40)
+        : [p1, p2];
+      
+      if (i > 0) arc.shift();
+      fullPath.push(...arc);
+    }
+    return fullPath;
+  }, [waypoints, shipment.shipmentType]);
 
-    const clampedProgress = Math.max(0, Math.min(100, progressPercent));
-    if (clampedProgress <= 0) return { pos: route[0], heading: calculateBearing(route[0], route[1] || route[0]) };
-    if (clampedProgress >= 100) return { pos: route[route.length - 1], heading: calculateBearing(route[route.length - 2] || route[0], route[route.length - 1]) };
-
-    // Calculate segment distances
+  // Precompute cumulative distances along detailed path for precision sub-pixel traversal
+  const pathMetrics = useMemo(() => {
+    if (detailedPath.length < 2) {
+      return { totalDistance: 1, segmentDistances: [1], cumulativeDistances: [0, 1] };
+    }
     const segmentDistances: number[] = [];
-    let totalDistance = 0;
-    for (let i = 0; i < route.length - 1; i++) {
-      const dist = calculateDistance(route[i], route[i + 1]);
-      const validDist = dist > 0 ? dist : 0.0001;
-      segmentDistances.push(validDist);
-      totalDistance += validDist;
+    const cumulativeDistances: number[] = [0];
+    let total = 0;
+
+    for (let i = 0; i < detailedPath.length - 1; i++) {
+      const d = haversineDistance(detailedPath[i], detailedPath[i + 1]);
+      const valid = d > 0.0001 ? d : 0.0001;
+      segmentDistances.push(valid);
+      total += valid;
+      cumulativeDistances.push(total);
     }
 
-    if (totalDistance === 0) return { pos: route[0], heading: 0 };
+    return { totalDistance: total || 1, segmentDistances, cumulativeDistances };
+  }, [detailedPath]);
 
-    const targetDistance = (clampedProgress / 100) * totalDistance;
-    let accumulated = 0;
-
-    for (let i = 0; i < segmentDistances.length; i++) {
-      const segDist = segmentDistances[i];
-      if (accumulated + segDist >= targetDistance || i === segmentDistances.length - 1) {
-        const remaining = targetDistance - accumulated;
-        const ratio = Math.max(0, Math.min(1, segDist > 0 ? remaining / segDist : 0));
-        const p1 = route[i];
-        const p2 = route[i + 1];
-
-        const lng = p1[0] + (p2[0] - p1[0]) * ratio;
-        const lat = p1[1] + (p2[1] - p1[1]) * ratio;
-        const heading = calculateBearing(p1, p2);
-
-        return { pos: [lng, lat], heading };
+  // Calculate position, heading, and split paths at exact progress percent (0-100)
+  const getInterpolatedTelemetry = useCallback(
+    (progress: number) => {
+      if (detailedPath.length === 0) {
+        return {
+          latLng: [40.6413, -73.7781] as [number, number],
+          heading: 0,
+          traveledCoords: [] as [number, number][],
+          remainingCoords: [] as [number, number][],
+          altitudeFt: 36000,
+          speedKts: 510,
+        };
       }
-      accumulated += segDist;
+      if (detailedPath.length === 1) {
+        return {
+          latLng: [detailedPath[0][1], detailedPath[0][0]] as [number, number],
+          heading: 0,
+          traveledCoords: [[detailedPath[0][1], detailedPath[0][0]] as [number, number]],
+          remainingCoords: [] as [number, number][],
+          altitudeFt: 0,
+          speedKts: 0,
+        };
+      }
+
+      const clamped = Math.max(0, Math.min(100, progress));
+      const targetDist = (clamped / 100) * pathMetrics.totalDistance;
+      const { cumulativeDistances } = pathMetrics;
+
+      let segIdx = 0;
+      for (let i = 0; i < cumulativeDistances.length - 1; i++) {
+        if (targetDist >= cumulativeDistances[i] && targetDist <= cumulativeDistances[i + 1]) {
+          segIdx = i;
+          break;
+        }
+        if (i === cumulativeDistances.length - 2) {
+          segIdx = i;
+        }
+      }
+
+      const segStartDist = cumulativeDistances[segIdx];
+      const segLen = pathMetrics.segmentDistances[segIdx] || 0.0001;
+      const t = Math.max(0, Math.min(1, (targetDist - segStartDist) / segLen));
+
+      const p1 = detailedPath[segIdx];
+      const p2 = detailedPath[segIdx + 1] || p1;
+
+      const lng = p1[0] + (p2[0] - p1[0]) * t;
+      const lat = p1[1] + (p2[1] - p1[1]) * t;
+      const heading = calculateBearing(p1, p2);
+
+      // Traveled points up to current position
+      const traveled: [number, number][] = [];
+      for (let i = 0; i <= segIdx; i++) {
+        traveled.push([detailedPath[i][1], detailedPath[i][0]]);
+      }
+      traveled.push([lat, lng]);
+
+      // Remaining points from current position
+      const remaining: [number, number][] = [[lat, lng]];
+      for (let i = segIdx + 1; i < detailedPath.length; i++) {
+        remaining.push([detailedPath[i][1], detailedPath[i][0]]);
+      }
+
+      // Realistic flight telemetry based on flight phase (takeoff, cruise, descent)
+      let altitudeFt = 36000;
+      let speedKts = 510;
+      if (shipment.shipmentType === 'Air') {
+        if (clamped < 10) {
+          altitudeFt = Math.round((clamped / 10) * 36000);
+          speedKts = Math.round(180 + (clamped / 10) * 330);
+        } else if (clamped > 90) {
+          const descRatio = (100 - clamped) / 10;
+          altitudeFt = Math.round(descRatio * 36000);
+          speedKts = Math.round(180 + descRatio * 330);
+        }
+      } else if (shipment.shipmentType === 'Sea') {
+        altitudeFt = 0;
+        speedKts = 19;
+      } else {
+        altitudeFt = 680;
+        speedKts = 65;
+      }
+
+      return {
+        latLng: [lat, lng] as [number, number],
+        heading,
+        traveledCoords: traveled,
+        remainingCoords: remaining,
+        altitudeFt,
+        speedKts,
+      };
+    },
+    [detailedPath, pathMetrics, shipment.shipmentType]
+  );
+
+  // Initialize Leaflet Map
+  useEffect(() => {
+    if (!mapElementRef.current) return;
+
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.remove();
+      mapInstanceRef.current = null;
     }
-
-    return { pos: route[route.length - 1], heading: 0 };
-  };
-
-  // Synchronize internal animated progress state smoothly towards target shipment.progressPercent
-  useEffect(() => {
-    const target = shipment.progressPercent || 0;
-
-    let frameId: number;
-    const animate = () => {
-      setAnimatedProgress((prev) => {
-        const diff = target - prev;
-        if (Math.abs(diff) < 0.05) return target;
-        return prev + diff * 0.08; // Smooth linear forward interpolation towards target progress
-      });
-      frameId = requestAnimationFrame(animate);
-    };
-
-    frameId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frameId);
-  }, [shipment.progressPercent]);
-
-  // Initialize MapLibre GL map with guaranteed raster tile style & ResizeObserver
-  useEffect(() => {
-    if (!mapContainerRef.current) return;
-
-    let map: maplibregl.Map;
 
     try {
-      const style = getRasterStyle(mapTheme);
-      map = new maplibregl.Map({
-        container: mapContainerRef.current,
-        style: style,
-        center: shipment.currentCoords || shipment.originCoords || [-73.7781, 40.6413],
+      const initialTelemetry = getInterpolatedTelemetry(currentProgressRef.current);
+
+      const map = L.map(mapElementRef.current, {
+        center: initialTelemetry.latLng,
         zoom: 3,
+        zoomControl: false,
         attributionControl: false,
+        worldCopyJump: true,
       });
 
-      mapRef.current = map;
+      mapInstanceRef.current = map;
 
-      map.on('load', () => {
-        setMapLoaded(true);
-        renderMapLayersAndMarkers(map);
-        setTimeout(() => map.resize(), 200);
+      // Base tile layer
+      const selected = TILE_PROVIDERS[mapTheme];
+      const tiles = L.tileLayer(selected.url, {
+        subdomains: selected.subdomains ? selected.subdomains.split('') : undefined,
+        maxZoom: selected.maxZoom,
+        attribution: selected.attribution,
       });
 
-      map.on('error', (e) => {
-        console.warn('[Map Component] Map load event note:', e);
-      });
-
-      // ResizeObserver to ensure map canvas recalculates dimensions whenever layout container resizes
-      const resizeObserver = new ResizeObserver(() => {
-        if (mapRef.current) {
-          mapRef.current.resize();
+      tiles.on('tileerror', (errorEvent: any) => {
+        const tile = errorEvent.tile as HTMLImageElement;
+        if (tile && !tile.dataset.fallbackTried) {
+          tile.dataset.fallbackTried = 'true';
+          tile.src = `https://tile.openstreetmap.org/${errorEvent.coords.z}/${errorEvent.coords.x}/${errorEvent.coords.y}.png`;
         }
       });
-      if (mapContainerRef.current) {
-        resizeObserver.observe(mapContainerRef.current);
-      }
+
+      tiles.addTo(map);
+      tileLayerRef.current = tiles;
+
+      map.whenReady(() => {
+        setMapReady(true);
+        setTimeout(() => map.invalidateSize(), 150);
+        setTimeout(() => map.invalidateSize(), 500);
+      });
+
+      const ro = new ResizeObserver(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      });
+      ro.observe(mapElementRef.current);
 
       return () => {
-        resizeObserver.disconnect();
+        ro.disconnect();
         map.remove();
-        mapRef.current = null;
+        mapInstanceRef.current = null;
       };
     } catch (err) {
-      console.error('Map initialization error:', err);
+      console.error('[Leaflet Map Init Error]', err);
     }
+  }, []);
+
+  // Update Tile Layer smoothly when Theme Changes without map destruction
+  useEffect(() => {
+    if (!mapInstanceRef.current || !tileLayerRef.current) return;
+    const selected = TILE_PROVIDERS[mapTheme];
+    tileLayerRef.current.setUrl(selected.url);
   }, [mapTheme]);
 
-  // Re-render polyline and pins when shipment coordinates or stops change
+  // Static Landmarks: Origin, Destination, Checkpoints
   useEffect(() => {
-    if (mapRef.current && mapLoaded) {
-      renderMapLayersAndMarkers(mapRef.current);
-    }
-  }, [shipment.originCoords, shipment.destinationCoords, shipment.stops, shipment.shipmentType, mapLoaded]);
-
-  // Update vehicle position & rotation live on animatedProgress change
-  useEffect(() => {
-    if (!mapRef.current || !mapLoaded || !vehicleMarkerRef.current) return;
-
-    const { pos, heading } = calculatePositionAndHeading(animatedProgress);
-    vehicleMarkerRef.current.setLngLat(pos);
-
-    // Apply rotation transform to vehicle icon
-    if (vehicleInnerElRef.current) {
-      vehicleInnerElRef.current.style.transform = `rotate(${Math.round(heading)}deg)`;
-    }
-
-    // Pan map smoothly to active position if tracking
-    if (!isAdminControl) {
-      mapRef.current.easeTo({ center: pos, duration: 400 });
-    }
-
-    // Update polyline line color or dash if paused
-    if (mapRef.current.getLayer('route-line')) {
-      const isPausedOrDelayed = shipment.isPaused || shipment.currentStatus === 'Paused' || shipment.currentStatus === 'Delayed';
-      mapRef.current.setPaintProperty(
-        'route-line',
-        'line-color',
-        isPausedOrDelayed ? '#f59e0b' : mapTheme === 'dark' ? '#38bdf8' : '#0284c7'
-      );
-    }
-  }, [animatedProgress, shipment.currentStatus, shipment.isPaused, mapLoaded, mapTheme]);
-
-  // Function to build layers, polyline, origin/destination pins, and animated vehicle marker
-  const renderMapLayersAndMarkers = (map: maplibregl.Map) => {
-    const routeCoords = getRouteCoordinates();
-
-    // Update or add route GeoJSON source
-    if (map.getSource('route')) {
-      (map.getSource('route') as maplibregl.GeoJSONSource).setData({
-        type: 'Feature',
-        properties: {},
-        geometry: { type: 'LineString', coordinates: routeCoords },
-      });
-    } else {
-      map.addSource('route', {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          properties: {},
-          geometry: { type: 'LineString', coordinates: routeCoords },
-        },
-      });
-
-      // Route Casing Outer Glow
-      map.addLayer({
-        id: 'route-casing',
-        type: 'line',
-        source: 'route',
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: {
-          'line-color': '#0284c7',
-          'line-width': 8,
-          'line-opacity': 0.35,
-          'line-blur': 4,
-        },
-      });
-
-      // Route Primary Line
-      map.addLayer({
-        id: 'route-line',
-        type: 'line',
-        source: 'route',
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: {
-          'line-color': shipment.currentStatus === 'Delayed' || shipment.isPaused ? '#f59e0b' : '#38bdf8',
-          'line-width': 4,
-        },
-      });
-    }
-
-    // Fit map bounds to encompass full route
-    if (routeCoords.length > 0) {
-      const bounds = new maplibregl.LngLatBounds();
-      routeCoords.forEach((coord) => bounds.extend(coord));
-      map.fitBounds(bounds, { padding: 70, maxZoom: 7, duration: 1000 });
-    }
-
-    // Clean existing markers
-    if (originMarkerRef.current) originMarkerRef.current.remove();
-    if (destMarkerRef.current) destMarkerRef.current.remove();
-    if (vehicleMarkerRef.current) vehicleMarkerRef.current.remove();
-    stopMarkersRef.current.forEach((m) => m.remove());
-    stopMarkersRef.current = [];
+    const map = mapInstanceRef.current;
+    if (!map || !mapReady) return;
 
     // 1. ORIGIN MARKER
-    const originEl = document.createElement('div');
-    originEl.className = 'flex flex-col items-center group cursor-pointer';
-    originEl.innerHTML = `
-      <div class="px-2 py-0.5 bg-emerald-600 text-white font-mono text-[10px] font-bold rounded shadow-lg border border-emerald-400 mb-1 tracking-wider whitespace-nowrap">
-        ORIGIN
-      </div>
-      <div class="w-7 h-7 rounded-full bg-emerald-500 border-2 border-white shadow-[0_0_12px_rgba(16,185,129,0.8)] flex items-center justify-center text-white">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-      </div>
-    `;
-    originMarkerRef.current = new maplibregl.Marker({ element: originEl, anchor: 'bottom' })
-      .setLngLat(shipment.originCoords)
-      .setPopup(new maplibregl.Popup({ offset: 12 }).setHTML(`
-        <div style="font-family: sans-serif; padding: 4px;">
-          <div style="color: #10b981; font-weight: bold; font-size: 12px; text-transform: uppercase;">Dispatch Origin</div>
-          <div style="color: #0f172a; font-weight: 700; font-size: 13px;">${shipment.origin}</div>
+    if (originMarkerRef.current) originMarkerRef.current.remove();
+    const originLatLng: [number, number] = [shipment.originCoords[1], shipment.originCoords[0]];
+    const originIcon = L.divIcon({
+      className: 'custom-origin-icon',
+      html: `
+        <div style="display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%);">
+          <div style="background: #10b981; color: #ffffff; font-family: monospace; font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 5px; border: 1px solid #34d399; box-shadow: 0 4px 10px rgba(0,0,0,0.6); white-space: nowrap; margin-bottom: 3px; letter-spacing: 0.5px;">
+            DEP: ORIGIN
+          </div>
+          <div style="width: 28px; height: 28px; border-radius: 50%; background: #10b981; border: 2.5px solid #ffffff; box-shadow: 0 0 18px rgba(16,185,129,0.95); display: flex; align-items: center; justify-content: center; color: white;">
+            <svg style="width: 15px; height: 15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+          </div>
         </div>
-      `))
+      `,
+      iconSize: [28, 28],
+      iconAnchor: [14, 28],
+    });
+    originMarkerRef.current = L.marker(originLatLng, { icon: originIcon })
+      .bindPopup(`
+        <div style="padding: 6px; font-family: system-ui, sans-serif;">
+          <div style="color: #10b981; font-weight: 800; font-size: 11px; text-transform: uppercase;">Departure Origin Hub</div>
+          <div style="color: #ffffff; font-weight: 700; font-size: 13px;">${shipment.origin}</div>
+          <div style="color: #94a3b8; font-size: 10px; margin-top: 2px;">Shipper: ${shipment.sender}</div>
+        </div>
+      `)
       .addTo(map);
 
     // 2. DESTINATION MARKER
-    const destEl = document.createElement('div');
-    destEl.className = 'flex flex-col items-center group cursor-pointer';
-    destEl.innerHTML = `
-      <div class="px-2 py-0.5 bg-rose-600 text-white font-mono text-[10px] font-bold rounded shadow-lg border border-rose-400 mb-1 tracking-wider whitespace-nowrap">
-        DESTINATION
-      </div>
-      <div class="w-7 h-7 rounded-full bg-rose-500 border-2 border-white shadow-[0_0_12px_rgba(244,63,94,0.8)] flex items-center justify-center text-white">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2v16z"/></svg>
-      </div>
-    `;
-    destMarkerRef.current = new maplibregl.Marker({ element: destEl, anchor: 'bottom' })
-      .setLngLat(shipment.destinationCoords)
-      .setPopup(new maplibregl.Popup({ offset: 12 }).setHTML(`
-        <div style="font-family: sans-serif; padding: 4px;">
-          <div style="color: #f43f5e; font-weight: bold; font-size: 12px; text-transform: uppercase;">Final Destination</div>
-          <div style="color: #0f172a; font-weight: 700; font-size: 13px;">${shipment.destination}</div>
-          <div style="color: #64748b; font-size: 11px;">Consignee: ${shipment.receiver}</div>
+    if (destMarkerRef.current) destMarkerRef.current.remove();
+    const destLatLng: [number, number] = [shipment.destinationCoords[1], shipment.destinationCoords[0]];
+    const destIcon = L.divIcon({
+      className: 'custom-dest-icon',
+      html: `
+        <div style="display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%);">
+          <div style="background: #f43f5e; color: #ffffff; font-family: monospace; font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 5px; border: 1px solid #fb7185; box-shadow: 0 4px 10px rgba(0,0,0,0.6); white-space: nowrap; margin-bottom: 3px; letter-spacing: 0.5px;">
+            ARR: FINAL DEST
+          </div>
+          <div style="width: 28px; height: 28px; border-radius: 50%; background: #f43f5e; border: 2.5px solid #ffffff; box-shadow: 0 0 18px rgba(244,63,94,0.95); display: flex; align-items: center; justify-content: center; color: white;">
+            <svg style="width: 15px; height: 15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2v16z"/></svg>
+          </div>
         </div>
-      `))
+      `,
+      iconSize: [28, 28],
+      iconAnchor: [14, 28],
+    });
+    destMarkerRef.current = L.marker(destLatLng, { icon: destIcon })
+      .bindPopup(`
+        <div style="padding: 6px; font-family: system-ui, sans-serif;">
+          <div style="color: #f43f5e; font-weight: 800; font-size: 11px; text-transform: uppercase;">Final Destination Hub</div>
+          <div style="color: #ffffff; font-weight: 700; font-size: 13px;">${shipment.destination}</div>
+          <div style="color: #94a3b8; font-size: 11px; margin-top: 2px;">Consignee: ${shipment.receiver}</div>
+        </div>
+      `)
       .addTo(map);
 
     // 3. INTERMEDIATE CHECKPOINT STOPS
+    checkpointMarkersRef.current.forEach((m) => m.remove());
+    checkpointMarkersRef.current = [];
+
     if (shipment.stops && shipment.stops.length > 0) {
       shipment.stops.forEach((stop, idx) => {
-        if (typeof stop.lng !== 'number' || typeof stop.lat !== 'number') return;
-        const stopEl = document.createElement('div');
-        stopEl.className = 'flex flex-col items-center cursor-pointer';
-        const isCurrentStop = stop.status === 'current';
+        if (typeof stop.lat !== 'number' || typeof stop.lng !== 'number') return;
         const isCompleted = stop.status === 'completed';
+        const isCurrent = stop.status === 'current';
 
-        const badgeColor = isCompleted
-          ? 'bg-emerald-600 border-emerald-400 text-white'
-          : isCurrentStop
-          ? 'bg-amber-500 border-amber-300 text-slate-950 font-black animate-pulse'
-          : 'bg-slate-700 border-slate-500 text-slate-200';
-
-        stopEl.innerHTML = `
-          <div class="px-1.5 py-0.5 ${badgeColor} font-mono text-[9px] font-bold rounded shadow-md border mb-0.5 whitespace-nowrap">
-            Stop #${idx + 1}
-          </div>
-          <div class="w-4 h-4 rounded-full ${isCurrentStop ? 'bg-amber-400 ring-4 ring-amber-400/40' : isCompleted ? 'bg-emerald-400' : 'bg-slate-500'} border-2 border-white shadow-md"></div>
-        `;
-
-        const marker = new maplibregl.Marker({ element: stopEl, anchor: 'bottom' })
-          .setLngLat([stop.lng, stop.lat])
-          .setPopup(new maplibregl.Popup({ offset: 10 }).setHTML(`
-            <div style="font-family: sans-serif; padding: 4px;">
-              <div style="font-weight: bold; color: #0284c7; font-size: 12px;">Checkpoint #${idx + 1}: ${stop.name}</div>
-              <div style="color: #64748b; font-size: 11px;">Status: <strong style="color: ${isCompleted ? '#10b981' : isCurrentStop ? '#f59e0b' : '#64748b'};">${stop.status.toUpperCase()}</strong></div>
-              <div style="color: #64748b; font-size: 11px;">ETA: ${stop.estimatedArrival}</div>
-              ${stop.notes ? `<div style="color: #334155; font-size: 10px; margin-top: 2px;">${stop.notes}</div>` : ''}
+        const bg = isCompleted ? '#10b981' : isCurrent ? '#f59e0b' : '#64748b';
+        const stopIcon = L.divIcon({
+          className: 'custom-stop-icon',
+          html: `
+            <div style="display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%);">
+              <div style="background: ${bg}; color: white; font-family: monospace; font-size: 8px; font-weight: bold; padding: 1px 5px; border-radius: 4px; margin-bottom: 2px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.5);">
+                WPT #${idx + 1}
+              </div>
+              <div style="width: 18px; height: 18px; border-radius: 50%; background: ${bg}; border: 2px solid #ffffff; box-shadow: 0 0 10px rgba(0,0,0,0.6);"></div>
             </div>
-          `))
+          `,
+          iconSize: [18, 18],
+          iconAnchor: [9, 18],
+        });
+
+        const stopMarker = L.marker([stop.lat, stop.lng], { icon: stopIcon })
+          .bindPopup(`
+            <div style="padding: 6px; font-family: system-ui, sans-serif;">
+              <div style="font-weight: 800; color: #38bdf8; font-size: 12px;">Waypoint #${idx + 1}: ${stop.name}</div>
+              <div style="color: #cbd5e1; font-size: 11px; margin-top: 2px;">Status: <strong style="color: ${bg}; text-transform: uppercase;">${stop.status}</strong></div>
+              <div style="color: #94a3b8; font-size: 10px;">ETA: ${stop.estimatedArrival}</div>
+              ${stop.notes ? `<div style="color: #64748b; font-size: 10px; margin-top: 2px;">${stop.notes}</div>` : ''}
+            </div>
+          `)
           .addTo(map);
 
-        stopMarkersRef.current.push(marker);
+        checkpointMarkersRef.current.push(stopMarker);
       });
     }
 
-    // 4. ANIMATED VEHICLE LIVE MARKER WITH SVG ROTATION
-    const { pos, heading } = calculatePositionAndHeading(animatedProgress);
-    const vehicleEl = document.createElement('div');
-    vehicleEl.className = 'relative flex items-center justify-center cursor-pointer';
-
-    // Pick SVG icon and style based on shipmentType
-    let vehicleSvg = '';
-    let shadowColor = '';
-
-    if (shipment.shipmentType === 'Air') {
-      vehicleSvg = `
-        <div className="relative flex items-center justify-center">
-          {/* Flight Jet Trail Effect behind plane */}
-          <div className="absolute -bottom-3 w-1.5 h-6 bg-gradient-to-t from-transparent via-cyan-400 to-sky-200 rounded-full blur-[1px] opacity-80 animate-pulse"></div>
-          <svg class="w-8 h-8 text-white drop-shadow-[0_2px_12px_rgba(56,189,248,0.9)] transition-transform duration-200" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-          </svg>
-        </div>`;
-      shadowColor = 'shadow-[0_0_25px_rgba(56,189,248,0.95)] bg-gradient-to-tr from-sky-600 via-blue-600 to-cyan-400';
-    } else if (shipment.shipmentType === 'Sea') {
-      vehicleSvg = `
-        <svg class="w-6 h-6 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M20 21c-1.39 0-2.78-.47-4-1.32-2.44 1.71-5.56 1.71-8 0C6.78 20.53 5.39 21 4 21H2v2h2c1.38 0 2.74-.35 4-.99 2.52 1.29 5.48 1.29 8 0 1.26.64 2.62.99 4 .99h2v-2h-2zM3.95 19H4c1.6 0 3.02-.88 4-2 .98 1.12 2.4 2 4 2s3.02-.88 4-2c.98 1.12 2.4 2 4 2h.05l1.89-6.68c.08-.26.06-.54-.04-.78s-.28-.42-.52-.51L20 10.4V6c0-.55-.45-1-1-1h-3V3c0-.55-.45-1-1-1h-2c-.55 0-1 .45-1 1v2H9c-.55 0-1 .45-1 1v4.4l-1.38.53c-.24.09-.42.27-.52.51s-.12.52-.04.78L3.95 19zM15 5h-2V4h2v1z"/>
-        </svg>`;
-      shadowColor = 'shadow-[0_0_20px_rgba(14,165,233,0.8)] bg-gradient-to-tr from-cyan-600 via-teal-600 to-sky-400';
-    } else if (shipment.shipmentType === 'Road') {
-      vehicleSvg = `
-        <svg class="w-6 h-6 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
-        </svg>`;
-      shadowColor = 'shadow-[0_0_20px_rgba(99,102,241,0.8)] bg-gradient-to-tr from-indigo-600 via-blue-600 to-sky-400';
-    } else {
-      // Express Delivery
-      vehicleSvg = `
-        <svg class="w-6 h-6 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-        </svg>`;
-      shadowColor = 'shadow-[0_0_20px_rgba(245,158,11,0.8)] bg-gradient-to-tr from-amber-500 via-orange-500 to-yellow-400';
+    // Initial fit bounds
+    const allLatLngs: L.LatLngExpression[] = detailedPath.map((p) => [p[1], p[0]]);
+    if (allLatLngs.length >= 2) {
+      map.fitBounds(L.latLngBounds(allLatLngs), { padding: [55, 55], maxZoom: 6 });
     }
+  }, [detailedPath, shipment.originCoords, shipment.destinationCoords, shipment.stops, mapReady]);
 
+  // Build the high-fidelity vector vehicle HTML
+  const buildVehicleIconHtml = (heading: number, altitudeFt: number, speedKts: number) => {
     const isDelayed = shipment.currentStatus === 'Delayed' || shipment.isPaused;
-    if (isDelayed) {
-      shadowColor = 'shadow-[0_0_20px_rgba(239,68,68,0.9)] bg-gradient-to-tr from-red-600 via-amber-600 to-rose-500';
+    const type = shipment.shipmentType;
+
+    // Vector Airplane: Pixel-Perfect Widebody Jet silhouette with engines, winglets, strobe lights, and contrails
+    let vehicleSvg = '';
+    let hudTagText = '';
+
+    if (type === 'Air') {
+      hudTagText = `✈ FL${Math.round(altitudeFt / 100)} • ${speedKts} KTS`;
+      vehicleSvg = `
+        <svg viewBox="0 0 64 64" width="46" height="46" style="filter: drop-shadow(0 0 10px rgba(56,189,248,0.7)); display: block;">
+          <defs>
+            <linearGradient id="fuselageGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#ffffff" />
+              <stop offset="50%" stop-color="#e0f2fe" />
+              <stop offset="100%" stop-color="#38bdf8" />
+            </linearGradient>
+            <linearGradient id="wingGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#f8fafc" />
+              <stop offset="100%" stop-color="#0284c7" />
+            </linearGradient>
+            <linearGradient id="contrailGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="rgba(56,189,248,0.85)" />
+              <stop offset="100%" stop-color="rgba(56,189,248,0)" />
+            </linearGradient>
+          </defs>
+
+          <!-- Supersonic Jet Contrails streaming from twin engines -->
+          <line x1="22" y1="42" x2="22" y2="62" stroke="url(#contrailGrad)" stroke-width="2.5" stroke-linecap="round" class="contrail-glow" />
+          <line x1="42" y1="42" x2="42" y2="62" stroke="url(#contrailGrad)" stroke-width="2.5" stroke-linecap="round" class="contrail-glow" />
+
+          <!-- Swept Main Wings -->
+          <polygon points="32,24 62,37 60,40 36,34" fill="url(#wingGrad)" stroke="#38bdf8" stroke-width="0.75" />
+          <polygon points="32,24 2,37 4,40 28,34" fill="url(#wingGrad)" stroke="#38bdf8" stroke-width="0.75" />
+
+          <!-- Winglets -->
+          <polygon points="62,37 63,33 60,37" fill="#38bdf8" />
+          <polygon points="2,37 1,33 4,37" fill="#38bdf8" />
+
+          <!-- Twin Underslung Turbofan Nacelles -->
+          <rect x="20" y="32" width="4.5" height="10" rx="2" fill="#0369a1" stroke="#38bdf8" stroke-width="0.75" />
+          <rect x="39.5" y="32" width="4.5" height="10" rx="2" fill="#0369a1" stroke="#38bdf8" stroke-width="0.75" />
+
+          <!-- Horizontal Tail Stabilizers -->
+          <polygon points="32,50 48,58 46,60 32,54" fill="#0284c7" stroke="#38bdf8" stroke-width="0.5" />
+          <polygon points="32,50 16,58 18,60 32,54" fill="#0284c7" stroke="#38bdf8" stroke-width="0.5" />
+
+          <!-- Fuselage Body (Aerodynamic dart) -->
+          <path d="M32 4 C30 10, 29 20, 29 48 C29 55, 30.5 58, 32 60 C33.5 58, 35 55, 35 48 C35 20, 34 10, 32 4 Z" fill="url(#fuselageGrad)" stroke="#0284c7" stroke-width="0.8" />
+
+          <!-- Cockpit Glint -->
+          <ellipse cx="32" cy="14" rx="2" ry="3.5" fill="#0369a1" />
+
+          <!-- Vertical Tail Fin (Rudder) -->
+          <polygon points="31,46 33,46 32.5,58 31.5,58" fill="#38bdf8" />
+
+          <!-- FAA/ICAO Standard Navigation Strobes -->
+          <!-- Red port wing light -->
+          <circle cx="2" cy="37" r="2" fill="#ef4444" class="strobe-left-red" />
+          <!-- Green starboard wing light -->
+          <circle cx="62" cy="37" r="2" fill="#10b981" class="strobe-right-green" />
+          <!-- White anti-collision tail strobe -->
+          <circle cx="32" cy="59" r="2" fill="#ffffff" class="strobe-tail-white" />
+        </svg>
+      `;
+    } else if (type === 'Sea') {
+      hudTagText = `⚓ 19.4 KTS • AIS LIVE`;
+      vehicleSvg = `
+        <svg viewBox="0 0 64 64" width="44" height="44" style="filter: drop-shadow(0 0 10px rgba(56,189,248,0.7)); display: block;">
+          <!-- Vessel Hull -->
+          <path d="M32 4 C38 12, 42 24, 42 54 C38 58, 26 58, 22 54 C22 24, 26 12, 32 4 Z" fill="#0284c7" stroke="#38bdf8" stroke-width="1.5" />
+          <!-- Container Stacks -->
+          <rect x="26" y="20" width="12" height="6" fill="#38bdf8" rx="1" />
+          <rect x="26" y="28" width="12" height="6" fill="#0ea5e9" rx="1" />
+          <rect x="26" y="36" width="12" height="6" fill="#0284c7" rx="1" />
+          <!-- Bridge Navigation Deck -->
+          <rect x="27" y="44" width="10" height="5" fill="#ffffff" rx="1" />
+          <!-- Mast beacon -->
+          <circle cx="32" cy="46" r="1.5" fill="#10b981" class="strobe-right-green" />
+        </svg>
+      `;
+    } else {
+      hudTagText = type === 'Road' ? `🚛 65 MPH • GPS LOCK` : `📦 EXPRESS • GPS SYNC`;
+      vehicleSvg = `
+        <svg viewBox="0 0 64 64" width="40" height="40" style="filter: drop-shadow(0 0 10px rgba(56,189,248,0.7)); display: block;">
+          <!-- Vehicle Cab & Trailer -->
+          <rect x="24" y="6" width="16" height="36" rx="3" fill="#0284c7" stroke="#38bdf8" stroke-width="1.5" />
+          <rect x="26" y="8" width="12" height="10" rx="2" fill="#38bdf8" />
+          <!-- Windshield -->
+          <rect x="27" y="10" width="10" height="4" fill="#ffffff" />
+          <!-- Wheels -->
+          <rect x="21" y="14" width="3" height="7" rx="1" fill="#0f172a" />
+          <rect x="40" y="14" width="3" height="7" rx="1" fill="#0f172a" />
+          <rect x="21" y="30" width="3" height="8" rx="1" fill="#0f172a" />
+          <rect x="40" y="30" width="3" height="8" rx="1" fill="#0f172a" />
+          <!-- Headlights -->
+          <circle cx="28" cy="7" r="1.5" fill="#fef08a" class="strobe-tail-white" />
+          <circle cx="36" cy="7" r="1.5" fill="#fef08a" class="strobe-tail-white" />
+        </svg>
+      `;
     }
 
-    vehicleEl.innerHTML = `
-      <div class="relative flex items-center justify-center">
-        <div class="absolute w-12 h-12 rounded-full ${isDelayed ? 'bg-rose-500/40' : 'bg-sky-400/40'} animate-ping"></div>
-        <div class="vehicle-inner w-11 h-11 rounded-full ${shadowColor} border-2 border-white flex items-center justify-center z-10 transition-transform duration-300" style="transform: rotate(${Math.round(heading)}deg);">
+    const ringColor = isDelayed ? 'rgba(239, 68, 68, 0.45)' : 'rgba(56, 189, 248, 0.45)';
+    const ringBorder = isDelayed ? 'rgba(239, 68, 68, 0.9)' : 'rgba(56, 189, 248, 0.9)';
+
+    return `
+      <div style="position: relative; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; pointer-events: auto;">
+        
+        <!-- Radar Expanding Sonar Ping Ring -->
+        <div style="position: absolute; width: 64px; height: 64px; border-radius: 50%; background: ${ringColor}; border: 1.5px solid ${ringBorder}; pointer-events: none;" class="radar-beacon-ripple"></div>
+
+        <!-- Rotating Vehicle Container (Plane / Vessel / Truck) -->
+        <div class="radar-vehicle-rotor" style="position: relative; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; transform: rotate(${Math.round(heading)}deg); transform-origin: center center; will-change: transform;">
           ${vehicleSvg}
         </div>
+
+        <!-- Upright Live Flight Telemetry HUD Tag (Counter-rotated / upright above aircraft) -->
+        <div class="radar-hud-tag" style="position: absolute; top: -14px; left: 50%; transform: translateX(-50%); background: rgba(2, 6, 23, 0.92); border: 1px solid #38bdf8; color: #38bdf8; font-family: monospace; font-size: 9px; font-weight: 800; padding: 1.5px 6px; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.8), 0 0 10px rgba(56,189,248,0.3); white-space: nowrap; pointer-events: none; z-index: 10;">
+          ${hudTagText}
+        </div>
+
       </div>
     `;
-
-    vehicleInnerElRef.current = vehicleEl.querySelector('.vehicle-inner');
-
-    vehicleMarkerRef.current = new maplibregl.Marker({ element: vehicleEl })
-      .setLngLat(pos)
-      .setPopup(new maplibregl.Popup({ offset: 16 }).setHTML(`
-        <div style="font-family: sans-serif; padding: 6px;">
-          <div style="font-weight: 800; color: #0284c7; font-size: 13px;">${shipment.trackingCode} (${shipment.shipmentType} Freight)</div>
-          <div style="color: #0f172a; font-weight: 700; font-size: 12px; margin-top: 2px;">Status: ${shipment.currentStatus}</div>
-          <div style="color: #475569; font-size: 11px;">Current Terminal: ${shipment.currentLocationName}</div>
-          <div style="color: #0284c7; font-size: 11px; font-weight: bold; margin-top: 2px;">Progress: ${Math.round(shipment.progressPercent || 0)}%</div>
-        </div>
-      `))
-      .addTo(map);
   };
 
-  // Fullscreen map toggle
+  // Continuous Buttery-Smooth Animation Loop
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !mapReady) return;
+
+    let animFrameId: number;
+    let lastTimestamp = performance.now();
+
+    // 1. Initialize Polylines
+    if (!traveledCasingRef.current) {
+      traveledCasingRef.current = L.polyline([], {
+        color: '#0284c7',
+        weight: 7,
+        opacity: 0.4,
+        lineCap: 'round',
+        lineJoin: 'round',
+      }).addTo(map);
+    }
+
+    if (!traveledLineRef.current) {
+      traveledLineRef.current = L.polyline([], {
+        color: shipment.isPaused || shipment.currentStatus === 'Delayed' ? '#f59e0b' : '#38bdf8',
+        weight: 3.5,
+        opacity: 0.98,
+        lineCap: 'round',
+        lineJoin: 'round',
+      }).addTo(map);
+    }
+
+    if (!projectedLineRef.current) {
+      projectedLineRef.current = L.polyline([], {
+        color: '#0369a1',
+        weight: 2.5,
+        opacity: 0.55,
+        dashArray: '5, 8',
+        lineCap: 'round',
+        lineJoin: 'round',
+      }).addTo(map);
+    }
+
+    // 2. Initialize Vehicle Marker once
+    const initTelemetry = getInterpolatedTelemetry(currentProgressRef.current);
+    currentHeadingRef.current = initTelemetry.heading;
+
+    if (!vehicleMarkerRef.current) {
+      const icon = L.divIcon({
+        className: 'custom-vehicle-radar-icon',
+        html: buildVehicleIconHtml(initTelemetry.heading, initTelemetry.altitudeFt, initTelemetry.speedKts),
+        iconSize: [64, 64],
+        iconAnchor: [32, 32],
+      });
+
+      vehicleMarkerRef.current = L.marker(initTelemetry.latLng, {
+        icon,
+        zIndexOffset: 1000,
+      }).addTo(map);
+
+      vehicleMarkerRef.current.bindPopup(`
+        <div style="padding: 6px; font-family: system-ui, sans-serif; min-width: 170px;">
+          <div style="font-weight: 800; color: #38bdf8; font-size: 13px;">${shipment.trackingCode}</div>
+          <div style="color: #cbd5e1; font-size: 11px; margin-top: 2px;">Type: <strong style="color: #38bdf8;">${shipment.shipmentType} Cargo</strong></div>
+          <div style="color: #cbd5e1; font-size: 11px;">Status: <strong style="color: ${shipment.isPaused ? '#f59e0b' : '#34d399'};">${shipment.currentStatus}</strong></div>
+          <div style="color: #94a3b8; font-size: 11px;">Current: ${shipment.currentLocationName}</div>
+          <div style="color: #38bdf8; font-size: 11px; font-weight: bold; margin-top: 3px;" id="popup-progress-val">Progress: ${Math.round(currentProgressRef.current)}%</div>
+        </div>
+      `);
+    }
+
+    // 3. Animation Tick Function
+    const tick = (now: number) => {
+      const deltaSec = Math.min((now - lastTimestamp) / 1000, 0.1);
+      lastTimestamp = now;
+
+      // In-flight autonomous live cruise mode: smooth realistic forward drift when in transit
+      const isHalted = shipment.isPaused || shipment.currentStatus === 'Delayed' || shipment.currentStatus === 'Delivered';
+
+      if (isSimulatingFlight) {
+        // Fast forward simulation loop (takes ~16s to fly full route)
+        currentProgressRef.current += deltaSec * 6.0;
+        if (currentProgressRef.current >= 100) {
+          currentProgressRef.current = 100;
+          setIsSimulatingFlight(false);
+        }
+      } else if (!isHalted && isLiveCruising) {
+        // Normal live cruise micro-advancement (~0.04% per sec)
+        const target = targetProgressRef.current;
+        const diff = target - currentProgressRef.current;
+        if (Math.abs(diff) > 0.05) {
+          // Lerp toward target smoothly
+          currentProgressRef.current += diff * Math.min(1, deltaSec * 4);
+        } else {
+          // Subtle authentic flight drift along the active airway
+          currentProgressRef.current = Math.min(99.5, currentProgressRef.current + deltaSec * 0.035);
+        }
+      } else {
+        // Static or paused: smoothly reach target
+        const diff = targetProgressRef.current - currentProgressRef.current;
+        if (Math.abs(diff) > 0.01) {
+          currentProgressRef.current += diff * Math.min(1, deltaSec * 5);
+        }
+      }
+
+      // Calculate current coordinates and heading
+      const telemetry = getInterpolatedTelemetry(currentProgressRef.current);
+
+      // Smooth heading angle via shortest-angle interpolation
+      currentHeadingRef.current = lerpAngle(currentHeadingRef.current, telemetry.heading, Math.min(1, deltaSec * 8));
+
+      // Update Leaflet marker position
+      if (vehicleMarkerRef.current) {
+        vehicleMarkerRef.current.setLatLng(telemetry.latLng);
+
+        // Hardware-accelerated direct DOM element transform update (zero DOM thrash / no setIcon overhead)
+        const markerElement = vehicleMarkerRef.current.getElement();
+        if (markerElement) {
+          const rotor = markerElement.querySelector('.radar-vehicle-rotor') as HTMLElement;
+          if (rotor) {
+            rotor.style.transform = `rotate(${Math.round(currentHeadingRef.current)}deg)`;
+          }
+          const hudTag = markerElement.querySelector('.radar-hud-tag') as HTMLElement;
+          if (hudTag) {
+            if (shipment.shipmentType === 'Air') {
+              hudTag.textContent = `✈ FL${Math.round(telemetry.altitudeFt / 100)} • ${telemetry.speedKts} KTS`;
+            } else if (shipment.shipmentType === 'Sea') {
+              hudTag.textContent = `⚓ 19.4 KTS • AIS LIVE`;
+            } else {
+              hudTag.textContent = shipment.shipmentType === 'Road' ? `🚛 65 MPH • GPS` : `📦 EXPRESS • GPS`;
+            }
+          }
+        }
+      }
+
+      // Update Polylines: Traveled (solid neon) & Remaining (projected dashed)
+      if (traveledLineRef.current && traveledCasingRef.current) {
+        traveledLineRef.current.setLatLngs(telemetry.traveledCoords);
+        traveledCasingRef.current.setLatLngs(telemetry.traveledCoords);
+      }
+      if (projectedLineRef.current) {
+        projectedLineRef.current.setLatLngs(telemetry.remainingCoords);
+      }
+
+      // Sync display state occasionally
+      setDisplayProgress(currentProgressRef.current);
+
+      animFrameId = requestAnimationFrame(tick);
+    };
+
+    animFrameId = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(animFrameId);
+    };
+  }, [
+    mapReady,
+    isLiveCruising,
+    isSimulatingFlight,
+    shipment.shipmentType,
+    shipment.currentStatus,
+    shipment.isPaused,
+    getInterpolatedTelemetry,
+  ]);
+
+  // Fullscreen toggle handler
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+      containerRef.current.requestFullscreen().then(() => {
+        setIsFullscreen(true);
+        setTimeout(() => mapInstanceRef.current?.invalidateSize(), 200);
+      }).catch(() => {});
     } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+      document.exitFullscreen().then(() => {
+        setIsFullscreen(false);
+        setTimeout(() => mapInstanceRef.current?.invalidateSize(), 200);
+      }).catch(() => {});
     }
   };
 
-  const isPausedOrHalted = shipment.isPaused || shipment.currentStatus === 'Paused' || shipment.currentStatus === 'Delayed';
+  const fitFullRoute = () => {
+    if (!mapInstanceRef.current) return;
+    const allLatLngs: L.LatLngExpression[] = detailedPath.map((p) => [p[1], p[0]]);
+    if (allLatLngs.length >= 2) {
+      mapInstanceRef.current.fitBounds(L.latLngBounds(allLatLngs), { padding: [55, 55], maxZoom: 6 });
+    }
+  };
+
+  const focusVehicle = () => {
+    if (!mapInstanceRef.current) return;
+    const tele = getInterpolatedTelemetry(currentProgressRef.current);
+    mapInstanceRef.current.panTo(tele.latLng, { animate: true, duration: 0.8 });
+  };
+
+  const isPausedOrHalted =
+    shipment.isPaused || shipment.currentStatus === 'Paused' || shipment.currentStatus === 'Delayed';
 
   return (
     <div
@@ -490,216 +833,251 @@ export const MapComponent: React.FC<MapComponentProps> = ({
         isFullscreen ? 'fixed inset-0 z-50 rounded-none h-screen w-screen' : ''
       }`}
     >
-      {/* Top Overlay Logistics Banner */}
-      <div className="absolute top-2 left-2 right-2 sm:top-4 sm:left-4 sm:right-4 z-10 flex flex-wrap items-center justify-between gap-2 sm:gap-3 bg-slate-900/90 backdrop-blur-md p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-800/80 text-white shadow-xl">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className={`p-2 sm:p-2.5 rounded-xl border ${
-            isPausedOrHalted
-              ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
-              : 'bg-sky-500/20 text-sky-400 border-sky-500/40'
-          }`}>
-            {shipment.shipmentType === 'Air' && <Plane className="w-5 h-5 animate-pulse" />}
-            {shipment.shipmentType === 'Sea' && <Ship className="w-5 h-5 animate-pulse" />}
-            {shipment.shipmentType === 'Road' && <Truck className="w-5 h-5 animate-pulse" />}
-            {shipment.shipmentType === 'Express' && <Package className="w-5 h-5 animate-pulse" />}
+      {/* Top Overlay Logistics Radar Banner */}
+      <div className="absolute top-2 left-2 right-2 sm:top-4 sm:left-4 sm:right-4 z-20 flex flex-wrap items-center justify-between gap-2 bg-slate-900/90 backdrop-blur-md p-2.5 sm:p-3 rounded-xl border border-slate-800/90 text-white shadow-xl">
+        <div className="flex items-center gap-2.5">
+          <div
+            className={`p-2 rounded-xl border ${
+              isPausedOrHalted
+                ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                : 'bg-sky-500/20 text-sky-400 border-sky-500/40'
+            }`}
+          >
+            {shipment.shipmentType === 'Air' && <Plane className="w-4 h-4 sm:w-5 sm:h-5" />}
+            {shipment.shipmentType === 'Sea' && <Ship className="w-4 h-4 sm:w-5 sm:h-5" />}
+            {shipment.shipmentType === 'Road' && <Truck className="w-4 h-4 sm:w-5 sm:h-5" />}
+            {shipment.shipmentType === 'Express' && <Package className="w-4 h-4 sm:w-5 sm:h-5" />}
           </div>
 
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider">
-                {shipment.shipmentType} Freight Live Map
+              <span className="text-[11px] font-mono font-bold text-sky-400 uppercase tracking-wider">
+                {shipment.shipmentType} Radar Telemetry
               </span>
               {isPausedOrHalted ? (
-                <span className="px-2.5 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-300 rounded-full border border-amber-500/40 flex items-center gap-1 font-mono animate-pulse">
-                  <Pause className="w-3 h-3" /> TRANSIT PAUSED
+                <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-300 rounded border border-amber-500/40 font-mono">
+                  HOLD ACTIVE
                 </span>
               ) : (
-                <span className="px-2.5 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 rounded-full border border-emerald-500/40 flex items-center gap-1 font-mono">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" /> LIVE TRANSMITTING
+                <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 rounded border border-emerald-500/40 font-mono flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.3)]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>TRANSPONDER SYNC</span>
                 </span>
               )}
             </div>
-            <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-1.5 mt-0.5">
-              <span>{shipment.currentLocationName}</span>
+            <h3 className="text-xs sm:text-sm font-bold text-white truncate max-w-[200px] sm:max-w-xs">
+              {shipment.currentLocationName || 'In Flight Corridor'}
             </h3>
           </div>
         </div>
 
-        {/* Map Control Buttons (Theme, Fit Bounds, Zoom, Fullscreen) */}
-        <div className="flex items-center gap-2">
-          {/* Theme Toggle */}
+        {/* Map Actions & Flight Simulation Controls */}
+        <div className="flex items-center gap-1.5">
+          
+          {/* Live Flight Cruise Mode Toggle */}
           <button
-            onClick={() => setMapTheme(mapTheme === 'dark' ? 'light' : 'dark')}
-            className="p-2 rounded-xl bg-slate-950/80 hover:bg-slate-800 border border-slate-700 text-slate-300 transition-colors"
-            title="Toggle Light / Dark Map Vector Theme"
+            onClick={() => setIsLiveCruising(!isLiveCruising)}
+            className={`px-2.5 py-1.5 rounded-lg border text-xs font-mono font-semibold flex items-center gap-1.5 transition-all ${
+              isLiveCruising
+                ? 'bg-sky-500/20 text-sky-300 border-sky-500/40 shadow-[0_0_10px_rgba(56,189,248,0.2)]'
+                : 'bg-slate-950/80 text-slate-400 border-slate-700 hover:text-slate-200'
+            }`}
+            title="Toggle autonomous radar cruise movement"
           >
-            {mapTheme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-sky-400" />}
+            <Activity className={`w-3.5 h-3.5 ${isLiveCruising ? 'text-sky-400 animate-pulse' : 'text-slate-500'}`} />
+            <span className="hidden sm:inline">{isLiveCruising ? 'Cruise: Active' : 'Cruise: Paused'}</span>
           </button>
 
-          {/* Fit Route Bounds */}
+          {/* Simulate Full Flight Button */}
           <button
             onClick={() => {
-              if (mapRef.current) {
-                const routeCoords = getRouteCoordinates();
-                const bounds = new maplibregl.LngLatBounds();
-                routeCoords.forEach((c) => bounds.extend(c));
-                mapRef.current.fitBounds(bounds, { padding: 70, maxZoom: 7, duration: 800 });
-              }
+              currentProgressRef.current = 0;
+              setIsSimulatingFlight(true);
             }}
-            className="p-2 rounded-xl bg-slate-950/80 hover:bg-slate-800 border border-slate-700 text-slate-300 transition-colors text-xs font-mono font-bold flex items-center gap-1"
-            title="Fit Entire Shipment Route"
+            className="px-2.5 py-1.5 rounded-lg bg-slate-950/80 hover:bg-slate-800 border border-slate-700 text-sky-300 text-xs font-mono font-semibold flex items-center gap-1.5 transition-colors"
+            title="Simulate full flight from takeoff to landing"
+          >
+            <Play className="w-3 h-3 fill-current text-sky-400" />
+            <span className="hidden sm:inline">Sim Flight</span>
+          </button>
+
+          {/* Focus on Aircraft */}
+          <button
+            onClick={focusVehicle}
+            className="p-1.5 rounded-lg bg-slate-950/80 hover:bg-slate-800 border border-slate-700 text-slate-300 transition-colors"
+            title="Center Camera on Aircraft"
+          >
+            <Compass className="w-3.5 h-3.5 text-sky-400" />
+          </button>
+
+          {/* Theme Switcher: Radar Dark -> Satellite -> Streets -> Terrain */}
+          <button
+            onClick={() => {
+              const sequence: MapTheme[] = ['dark', 'satellite', 'streets', 'terrain'];
+              const nextIdx = (sequence.indexOf(mapTheme) + 1) % sequence.length;
+              setMapTheme(sequence[nextIdx]);
+            }}
+            className="px-2.5 py-1.5 rounded-lg bg-slate-950/80 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-mono font-semibold flex items-center gap-1.5 transition-colors"
+            title="Switch Map Tile Layer (100% Free, Zero API Keys Required)"
+          >
+            <Layers className="w-3.5 h-3.5 text-sky-400" />
+            <span className="capitalize hidden sm:inline">{TILE_PROVIDERS[mapTheme].label}</span>
+          </button>
+
+          {/* Reset View / Fit Full Route */}
+          <button
+            onClick={fitFullRoute}
+            className="p-1.5 rounded-lg bg-slate-950/80 hover:bg-slate-800 border border-slate-700 text-slate-300 transition-colors"
+            title="Fit Full Route Bounds"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Fit Route</span>
           </button>
 
-          {/* Zoom In */}
+          {/* Zoom Controls */}
           <button
-            onClick={() => mapRef.current?.zoomIn()}
-            className="p-2 rounded-xl bg-slate-950/80 hover:bg-slate-800 border border-slate-700 text-slate-300 transition-colors"
+            onClick={() => mapInstanceRef.current?.zoomIn()}
+            className="p-1.5 rounded-lg bg-slate-950/80 hover:bg-slate-800 border border-slate-700 text-slate-300 transition-colors"
             title="Zoom In"
           >
-            <ZoomIn className="w-4 h-4" />
+            <ZoomIn className="w-3.5 h-3.5" />
           </button>
 
-          {/* Zoom Out */}
           <button
-            onClick={() => mapRef.current?.zoomOut()}
-            className="p-2 rounded-xl bg-slate-950/80 hover:bg-slate-800 border border-slate-700 text-slate-300 transition-colors"
+            onClick={() => mapInstanceRef.current?.zoomOut()}
+            className="p-1.5 rounded-lg bg-slate-950/80 hover:bg-slate-800 border border-slate-700 text-slate-300 transition-colors"
             title="Zoom Out"
           >
-            <ZoomOut className="w-4 h-4" />
+            <ZoomOut className="w-3.5 h-3.5" />
           </button>
 
           {/* Fullscreen */}
           <button
             onClick={toggleFullscreen}
-            className="p-2 rounded-xl bg-slate-950/80 hover:bg-slate-800 border border-slate-700 text-slate-300 transition-colors"
-            title="Toggle Fullscreen Mode"
+            className="p-1.5 rounded-lg bg-slate-950/80 hover:bg-slate-800 border border-slate-700 text-slate-300 transition-colors"
+            title="Toggle Fullscreen"
           >
-            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </button>
         </div>
       </div>
 
-      {/* PAUSED / DELAY REASON OVERLAY BOX BANNER */}
+      {/* OPERATIONAL DELAY BANNER */}
       {isPausedOrHalted && (
-        <div className="absolute top-28 left-4 right-4 z-10 bg-slate-950/95 backdrop-blur-lg border-2 border-amber-500/80 p-4 sm:p-5 rounded-2xl shadow-2xl text-white space-y-3 max-w-xl mx-auto animate-in fade-in slide-in-from-top-4 duration-300">
-          <div className="flex items-center justify-between border-b border-amber-500/30 pb-2.5">
-            <div className="flex items-center gap-2 text-amber-400 font-mono font-bold text-xs uppercase tracking-wider">
-              <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 animate-bounce" />
-              <span>Shipment Temporarily Delayed</span>
+        <div className="absolute top-20 sm:top-24 left-3 right-3 sm:left-6 sm:right-6 z-20 bg-slate-950/95 backdrop-blur-md border border-amber-500/60 p-3.5 sm:p-4 rounded-xl shadow-2xl text-white space-y-2 max-w-lg mx-auto">
+          <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
+            <div className="flex items-center gap-1.5 text-amber-400 font-mono font-bold text-xs">
+              <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Consignment Operational Hold</span>
             </div>
-            <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-mono font-bold rounded uppercase">
-              Operational Hold
+            <span className="text-[10px] font-mono text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded">
+              CUSTOMS & INSPECTION
             </span>
           </div>
-
-          <div className="space-y-2 text-xs font-sans text-amber-100">
-            <div className="bg-amber-500/10 p-3 rounded-xl border border-amber-500/30 space-y-1">
-              <span className="text-[11px] font-bold text-amber-300 font-mono uppercase block">Reason for Hold:</span>
-              <p className="font-semibold text-white leading-relaxed">
-                {shipment.delayReason || 'Consignment temporarily held at transit hub for customs inspection & security verification.'}
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between pt-1 text-slate-300 font-mono text-[11px]">
-              <span className="flex items-center gap-1.5 text-slate-400">
-                <Clock className="w-3.5 h-3.5 text-amber-400" /> Estimated Resume Clearance:
-              </span>
-              <span className="font-bold text-sky-400">{shipment.estimatedResume || '2:30 PM UTC'}</span>
-            </div>
+          <p className="text-xs text-amber-100 leading-relaxed">
+            {shipment.delayReason ||
+              'Consignment temporarily held at transit hub for customs inspection & security verification.'}
+          </p>
+          <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-1">
+            <span className="flex items-center gap-1">
+              <Clock className="w-3 h-3 text-amber-400" /> Resumption Estimate:
+            </span>
+            <span className="font-bold text-sky-400">{shipment.estimatedResume || '2:30 PM UTC'}</span>
           </div>
         </div>
       )}
 
-      {/* Map Container Element */}
+      {/* The Leaflet Map Canvas */}
       <div
-        ref={mapContainerRef}
-        className={`w-full ${isFullscreen ? 'h-screen' : 'h-[420px] sm:h-[500px] md:h-[550px]'}`}
-        id="live-gps-map-canvas"
+        ref={mapElementRef}
+        className={`w-full relative z-0 theme-${mapTheme === 'dark' ? 'radar-dark' : mapTheme} ${
+          isFullscreen ? 'h-screen' : 'h-[380px] sm:h-[480px] md:h-[540px]'
+        }`}
+        style={{ minHeight: '350px' }}
       />
 
       {/* Bottom Route Progress Stats Bar */}
-      <div className="bg-slate-950/90 border-t border-slate-800 p-3.5 px-6 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-slate-300">
-        <div className="flex items-center gap-4">
-          <div>
+      <div className="bg-slate-950 border-t border-slate-800/90 p-3 px-4 sm:px-6 flex flex-wrap items-center justify-between gap-3 text-xs font-mono text-slate-300">
+        <div className="flex items-center gap-2 sm:gap-4 truncate">
+          <div className="truncate">
             <span className="text-slate-500 text-[10px] uppercase block font-bold">Origin Terminal</span>
-            <span className="text-white font-bold">{shipment.origin}</span>
+            <span className="text-white font-semibold truncate block max-w-[120px] sm:max-w-none">
+              {shipment.origin}
+            </span>
           </div>
-          <span className="text-slate-600">➔</span>
-          <div>
-            <span className="text-slate-500 text-[10px] uppercase block font-bold">Destination</span>
-            <span className="text-white font-bold">{shipment.destination}</span>
+          <span className="text-sky-400 font-black shrink-0">➔</span>
+          <div className="truncate">
+            <span className="text-slate-500 text-[10px] uppercase block font-bold">Destination Hub</span>
+            <span className="text-white font-semibold truncate block max-w-[120px] sm:max-w-none">
+              {shipment.destination}
+            </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4 sm:gap-6 shrink-0">
           <div>
             <span className="text-slate-500 text-[10px] uppercase block font-bold">Route Progress</span>
             <div className="flex items-center gap-2">
-              <div className="w-24 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+              <div className="w-20 sm:w-28 h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-700">
                 <div
-                  className="h-full bg-gradient-to-r from-sky-500 to-emerald-400 transition-all duration-300"
-                  style={{ width: `${Math.round(shipment.progressPercent || 0)}%` }}
+                  className="h-full bg-gradient-to-r from-sky-500 to-emerald-400 transition-all duration-150"
+                  style={{ width: `${Math.round(displayProgress)}%` }}
                 />
               </div>
-              <span className="text-sky-400 font-bold">{Math.round(shipment.progressPercent || 0)}%</span>
+              <span className="text-sky-400 font-bold">{Math.round(displayProgress)}%</span>
             </div>
           </div>
 
-          <div>
-            <span className="text-slate-500 text-[10px] uppercase block font-bold">Estimated Delivery</span>
-            <span className="text-white font-bold">{shipment.estimatedDelivery}</span>
+          <div className="hidden sm:block">
+            <span className="text-slate-500 text-[10px] uppercase block font-bold">Estimated Arrival</span>
+            <span className="text-white font-semibold">{shipment.estimatedDelivery}</span>
           </div>
         </div>
       </div>
 
       {/* Admin Panel Controls Hook (when isAdminControl === true) */}
       {isAdminControl && (
-        <div className="bg-slate-900 p-4 sm:p-5 border-t border-slate-800 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        <div className="bg-slate-900 p-3.5 sm:p-4 border-t border-slate-800 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
             <div className="flex items-center gap-2 font-mono text-xs font-bold text-sky-400 uppercase">
-              <Navigation className="w-4 h-4 text-sky-400" />
-              <span>Admin GPS Real-Time Movement Engine</span>
+              <Navigation className="w-3.5 h-3.5 text-sky-400" />
+              <span>Admin GPS Dispatcher Control</span>
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Advance to Next Checkpoint Button */}
               {onAdvanceNextCheckpoint && (
                 <button
                   onClick={onAdvanceNextCheckpoint}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-all font-mono"
-                  title="Jump vehicle position to the next checkpoint stop"
-                  id="admin-advance-checkpoint-btn"
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 text-xs font-bold font-mono"
+                  title="Advance vehicle to the next checkpoint"
                 >
-                  <FastForward className="w-3.5 h-3.5" /> Next Checkpoint
+                  Next Checkpoint
                 </button>
               )}
 
-              {/* Start / Pause Movement Toggle */}
               {onTogglePause && (
                 <button
                   onClick={() => onTogglePause(!shipment.isPaused)}
-                  className={`px-4 py-2 rounded-xl text-xs font-black font-mono flex items-center gap-2 transition-all shadow-md ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono flex items-center gap-1.5 transition-all ${
                     shipment.isPaused
                       ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
                       : 'bg-amber-500 hover:bg-amber-400 text-slate-950'
                   }`}
-                  id="admin-toggle-pause-btn"
                 >
-                  {shipment.isPaused ? <Play className="w-4 h-4 fill-current" /> : <Pause className="w-4 h-4 fill-current" />}
-                  {shipment.isPaused ? 'Resume Movement' : 'Pause Shipment Movement'}
+                  {shipment.isPaused ? (
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                  ) : (
+                    <Pause className="w-3.5 h-3.5 fill-current" />
+                  )}
+                  {shipment.isPaused ? 'Resume Movement' : 'Pause Movement'}
                 </button>
               )}
             </div>
           </div>
 
-          {/* Progress Slider */}
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <div className="flex justify-between text-xs font-mono">
-              <span className="text-slate-400 font-bold">Adjust Manual Progress Position:</span>
-              <span className="text-sky-400 font-black">{Math.round(shipment.progressPercent || 0)}%</span>
+              <span className="text-slate-400">Manual Progress Override:</span>
+              <span className="text-sky-400 font-bold">{Math.round(shipment.progressPercent || 0)}%</span>
             </div>
             <input
               type="range"
@@ -708,8 +1086,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
               step="1"
               value={shipment.progressPercent || 0}
               onChange={(e) => onUpdateProgress && onUpdateProgress(parseFloat(e.target.value))}
-              className="w-full h-2.5 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-sky-400 border border-slate-800"
-              id="admin-progress-slider"
+              className="w-full h-2 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-sky-400 border border-slate-800"
             />
           </div>
         </div>

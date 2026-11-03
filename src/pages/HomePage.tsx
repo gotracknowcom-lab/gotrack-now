@@ -57,12 +57,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       a: 'Our trade compliance engine handles automated Electronic Export Information (EEI), Commercial Invoices, Bills of Lading (BOL), Air Waybills (AWB), and Single Administrative Documents (SAD).'
     }
   ];
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-sky-500 selection:text-slate-950">
-      
+
       {/* HERO SECTION */}
-      <section className="relative pt-12 pb-24 bg-slate-950 text-white overflow-hidden border-b border-slate-800/80">
+      <section className="relative pt-8 sm:pt-12 pb-16 sm:pb-24 bg-slate-950 text-white overflow-hidden border-b border-slate-800/80">
         
         {/* Subtle glowing radial background */}
         <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#38bdf8_1.5px,transparent_1.5px)] [background-size:28px_28px] pointer-events-none" />
@@ -70,40 +69,44 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         <div className="absolute top-1/2 right-0 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
             
             {/* Left Hero Content */}
-            <div className="lg:col-span-7 space-y-6 text-left">
+            <div className="lg:col-span-7 space-y-5 sm:space-y-6 text-left">
               
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-500/10 border border-sky-400/30 text-sky-400 text-xs font-semibold tracking-wide font-mono shadow-[0_0_15px_rgba(56,189,248,0.2)]">
+              {/* Global Network Status Badge */}
+              <div
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-500/10 border border-sky-400/30 text-sky-400 text-xs font-semibold tracking-wide font-mono shadow-[0_0_15px_rgba(56,189,248,0.2)] select-none"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <Globe className="w-4 h-4 text-sky-400" />
                 <span>GLOBAL LOGISTICS & CARGO RADAR NETWORK</span>
               </div>
 
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1]">
-                Global Precision Freight & <br />
+              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.15]" style={{ textWrap: 'balance' }}>
+                Global Precision Freight & <br className="hidden sm:inline" />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-300">
                   Live Air & Cargo Radar
                 </span>
               </h1>
 
-              <p className="text-base sm:text-lg text-slate-300 max-w-2xl leading-relaxed">
+              <p className="text-sm sm:text-base lg:text-lg text-slate-300 max-w-2xl leading-relaxed">
                 Connect directly into multi-modal carrier transponders, maritime AIS satellite beacons, and customs terminals. Instant real-time GPS flight & vessel telemetry.
               </p>
 
               {/* Key Trust Signals */}
-              <div className="grid grid-cols-3 gap-4 pt-4 border-t border-slate-800/80 text-xs font-medium text-slate-300">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Real-time Transponder Sync</span>
+              <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-3 sm:pt-4 border-t border-slate-800/80 text-[11px] sm:text-xs font-medium text-slate-300">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
+                  <span>Transponder Radar</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Customs Auto-Clearance</span>
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
+                  <span>Customs Clearance</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>24/7 Live Support Chat</span>
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
+                  <span>24/7 Live Desk</span>
                 </div>
               </div>
 
@@ -111,13 +114,13 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
             {/* Right Hero Interactive Freight Card */}
             <div className="lg:col-span-5">
-              <div className="bg-slate-900/90 backdrop-blur-md rounded-3xl p-6 sm:p-8 text-white shadow-2xl border border-slate-800/80">
+              <div className="bg-slate-900/90 backdrop-blur-md rounded-2xl sm:rounded-3xl p-5 sm:p-7 text-white shadow-2xl border border-slate-800/80">
                 
                 {/* Tab selector */}
-                <div className="flex items-center bg-slate-950 p-1.5 rounded-2xl mb-6 border border-slate-800">
+                <div className="flex items-center bg-slate-950 p-1 rounded-xl sm:rounded-2xl mb-5 border border-slate-800">
                   <button
                     onClick={() => setActiveTab('track')}
-                    className={`flex-1 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all ${
+                    className={`flex-1 py-2 sm:py-2.5 text-xs sm:text-sm font-bold rounded-lg sm:rounded-xl transition-all ${
                       activeTab === 'track'
                         ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-[0_0_15px_rgba(56,189,248,0.2)]'
                         : 'text-slate-400 hover:text-white'
@@ -127,23 +130,23 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                   </button>
                   <button
                     onClick={() => setActiveTab('quote')}
-                    className={`flex-1 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all ${
+                    className={`flex-1 py-2 sm:py-2.5 text-xs sm:text-sm font-bold rounded-lg sm:rounded-xl transition-all ${
                       activeTab === 'quote'
                         ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-[0_0_15px_rgba(56,189,248,0.2)]'
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Rate Estimator
+                    Rate Calculator
                   </button>
                   <button
                     onClick={() => setActiveTab('hub')}
-                    className={`flex-1 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all ${
+                    className={`flex-1 py-2 sm:py-2.5 text-xs sm:text-sm font-bold rounded-lg sm:rounded-xl transition-all ${
                       activeTab === 'hub'
                         ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-[0_0_15px_rgba(56,189,248,0.2)]'
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Hub Locator
+                    Hub Radar
                   </button>
                 </div>
 
@@ -151,25 +154,43 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                 {activeTab === 'track' && (
                   <form onSubmit={handleSearch} className="space-y-4">
                     <div>
-                      <label className="block text-xs font-bold font-mono text-slate-400 uppercase mb-2">
-                        Enter Consignment / Tracking Code
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-bold font-mono text-slate-400 uppercase">
+                          Consignment / Tracking Code
+                        </label>
+                        <span className="text-[10px] text-sky-400 font-mono">12-Digit Manifest</span>
+                      </div>
                       <div className="relative">
                         <input
                           type="text"
                           value={trackingCode}
                           onChange={(e) => setTrackingCode(e.target.value)}
                           placeholder="e.g. GT48291584US"
-                          className="w-full bg-slate-950 text-white placeholder-slate-500 pl-11 pr-4 py-3.5 rounded-xl border border-slate-800 focus:outline-none focus:border-sky-500 font-mono text-sm tracking-wider font-bold"
+                          className="w-full bg-slate-950 text-white placeholder-slate-500 pl-11 pr-4 py-3 sm:py-3.5 rounded-xl border border-slate-800 focus:outline-none focus:border-sky-500 font-mono text-sm tracking-wider font-bold"
                           id="hero-card-tracking-input"
                         />
-                        <Search className="w-5 h-5 text-sky-400 absolute left-3.5 top-3.5" />
+                        <Search className="w-5 h-5 text-sky-400 absolute left-3.5 top-3 sm:top-3.5" />
                       </div>
+                    </div>
+
+                    {/* Quick One-Tap Sample Button */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="text-[11px] text-slate-500 font-mono">Quick Test:</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTrackingCode('GT48291584US');
+                          onNavigate('track', 'GT48291584US');
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-300 font-mono text-xs font-bold transition-colors"
+                      >
+                        GT48291584US (Air Express)
+                      </button>
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full py-4 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-slate-950 font-black text-sm rounded-xl transition-all shadow-[0_0_20px_rgba(56,189,248,0.3)] hover:shadow-[0_0_25px_rgba(56,189,248,0.5)] flex items-center justify-center gap-2 font-mono"
+                      className="w-full py-3.5 sm:py-4 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-slate-950 font-black text-sm rounded-xl transition-all shadow-[0_0_20px_rgba(56,189,248,0.3)] hover:shadow-[0_0_25px_rgba(56,189,248,0.5)] flex items-center justify-center gap-2 font-mono"
                       id="hero-card-track-submit"
                     >
                       <span>Track Shipment Live</span>

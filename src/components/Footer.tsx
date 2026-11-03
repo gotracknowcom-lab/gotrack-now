@@ -1,5 +1,5 @@
-import React from 'react';
-import { Package, Shield, Globe, Lock, Mail, MapPin, Phone } from 'lucide-react';
+import React, { useRef } from 'react';
+import { Shield, Globe, Lock, Mail, MapPin, Phone } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 
 interface FooterProps {
@@ -8,15 +8,34 @@ interface FooterProps {
 }
 
 export const Footer: React.FC<FooterProps> = ({ onNavigate, logoUrl }) => {
+  const lastFooterTapRef = useRef<number>(0);
+
+  const handleFooterSecretDoubleTap = (e: React.MouseEvent | React.TouchEvent) => {
+    const now = Date.now();
+    const diff = now - lastFooterTapRef.current;
+    if (diff < 400 && diff > 30) {
+      e.preventDefault();
+      onNavigate('admin_login');
+    } else {
+      lastFooterTapRef.current = now;
+    }
+  };
+
   return (
-    <footer className="bg-slate-950 text-slate-400 border-t border-slate-900 pt-16 pb-12">
+    <footer className="bg-slate-950 text-slate-400 border-t border-slate-900 pt-16 pb-16 md:pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 pb-12 border-b border-slate-900">
           
-          {/* Brand Info */}
+          {/* Brand Info with Secret Double-Tap */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl overflow-hidden border border-sky-500/30 shrink-0 shadow-md bg-slate-900">
+            <div
+              onClick={handleFooterSecretDoubleTap}
+              onTouchEnd={handleFooterSecretDoubleTap}
+              onDoubleClick={() => onNavigate('admin_login')}
+              className="flex items-center gap-3 cursor-pointer select-none group"
+              title="GoTrack Express"
+            >
+              <div className="w-10 h-10 rounded-xl overflow-hidden border border-sky-500/30 shrink-0 shadow-md bg-slate-900 group-hover:border-sky-400 transition-colors">
                 <img src={logoUrl || logoImg} alt="GoTrack Logo" className="w-full h-full object-contain p-0.5" />
               </div>
               <span className="text-2xl font-black text-white font-mono tracking-tight">GO<span className="text-sky-400">TRACK</span></span>
@@ -94,9 +113,11 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, logoUrl }) => {
           <div className="flex items-center gap-6">
             <span className="hover:text-slate-400 transition-colors cursor-pointer" onClick={() => onNavigate('privacy')}>Security Standards</span>
             <span className="hover:text-slate-400 transition-colors cursor-pointer" onClick={() => onNavigate('terms')}>Service Level Agreement</span>
+            <span className="hover:text-slate-400 transition-colors cursor-pointer" onClick={() => onNavigate('contact')}>Global Dispatch Desk</span>
           </div>
         </div>
       </div>
     </footer>
   );
 };
+

@@ -13,6 +13,8 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { AdminLogin } from './admin/AdminLogin';
 import { AdminDashboard } from './admin/AdminDashboard';
 
+import { MobileBottomNav } from './components/MobileBottomNav';
+
 export default function App() {
   const [currentTab, setCurrentTab] = useState<string>('home');
   const [activeTrackingCode, setActiveTrackingCode] = useState<string>('');
@@ -21,6 +23,15 @@ export default function App() {
   const [customLogo, setCustomLogo] = useState<string | undefined>(undefined);
 
   useEffect(() => {
+    // Secret global keyboard shortcut: Ctrl+Shift+A or Cmd+Shift+A opens Admin Login
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        handleNavigate('admin_login');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
     // Check Firebase Auth state for admin user
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setAdminUser(user);
@@ -38,7 +49,6 @@ export default function App() {
         }
 
         if (data.faviconUrl) {
-          // Dynamically update favicon in document head
           const faviconUrl = data.faviconUrl;
           let favEl = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
           if (!favEl) {
@@ -86,11 +96,10 @@ export default function App() {
     };
 
     syncRouteFromUrl();
-
-    // Listen to browser Back / Forward buttons
     window.addEventListener('popstate', syncRouteFromUrl);
 
     return () => {
+      window.removeEventListener('keydown', handleKeyDown);
       unsubscribe();
       unsubSettings();
       window.removeEventListener('popstate', syncRouteFromUrl);
@@ -103,7 +112,6 @@ export default function App() {
     }
     setCurrentTab(tab);
 
-    // Sync browser address bar URL seamlessly
     let path = '/';
     if (tab === 'admin_login') {
       path = '/admin/login';
@@ -160,12 +168,12 @@ export default function App() {
     );
   }
 
-  // Public Website Flow (Wrapped in Navigation and Footer)
+  // Public Website Flow (Wrapped in Navigation, MobileBottomNav, and Footer)
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       <Navigation currentTab={currentTab} onNavigate={handleNavigate} logoUrl={customLogo} />
 
-      <main className="flex-1">
+      <main className="flex-1 pb-16 md:pb-0">
         {currentTab === 'home' && <HomePage onNavigate={handleNavigate} />}
         {currentTab === 'track' && (
           <TrackingResultPage
@@ -180,6 +188,10 @@ export default function App() {
       </main>
 
       <Footer onNavigate={handleNavigate} logoUrl={customLogo} />
+
+      {/* Floating Bottom Nav for Mobile Screen Users */}
+      <MobileBottomNav currentTab={currentTab} onNavigate={handleNavigate} />
     </div>
   );
 }
+

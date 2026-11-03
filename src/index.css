@@ -1,1 +1,151 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Leaflet Container and Tile Styling Fixes */
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  background-color: #020617 !important;
+  font-family: inherit;
+  z-index: 1;
+}
+
+/* Default tile appearance */
+.leaflet-tile {
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* Tactical Dark Radar Mode - Transforms standard OSM tiles into a futuristic dark logistics radar with 0 API keys */
+.theme-radar-dark .leaflet-tile {
+  filter: invert(100%) hue-rotate(180deg) brightness(88%) contrast(115%) saturate(120%) !important;
+}
+
+/* Photorealistic Satellite Mode */
+.theme-satellite .leaflet-tile {
+  filter: brightness(0.98) contrast(1.1) !important;
+}
+
+/* Daylight Streets Mode */
+.theme-streets .leaflet-tile {
+  filter: brightness(1) contrast(1.02) !important;
+}
+
+/* Topographic / Humanitarian Terrain Mode */
+.theme-terrain .leaflet-tile {
+  filter: brightness(0.98) contrast(1.05) !important;
+}
+
+/* Dark mode custom popup styling */
+.leaflet-popup-content-wrapper {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+  border-radius: 14px !important;
+  border: 1px solid #334155 !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5) !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup-content {
+  margin: 10px 14px !important;
+  line-height: 1.4 !important;
+}
+
+.leaflet-popup-tip {
+  background: #0f172a !important;
+  border: 1px solid #334155 !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+  color: #94a3b8 !important;
+  padding: 8px 8px 0 0 !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: #38bdf8 !important;
+}
+
+/* Radar & Aircraft Flight Animation Keyframes */
+@keyframes radarBeaconExpand {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+@keyframes radarSonarSweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes strobeFlashRed {
+  0%, 85%, 100% { opacity: 0.2; }
+  90% { opacity: 1; filter: drop-shadow(0 0 6px #ef4444); }
+}
+
+@keyframes strobeFlashGreen {
+  0%, 85%, 100% { opacity: 0.2; }
+  90% { opacity: 1; filter: drop-shadow(0 0 6px #10b981); }
+}
+
+@keyframes strobeFlashWhite {
+  0%, 92%, 100% { opacity: 0.1; }
+  94%, 98% { opacity: 1; filter: drop-shadow(0 0 8px #ffffff); }
+}
+
+@keyframes contrailStream {
+  0% {
+    opacity: 0.7;
+    transform: scaleY(0.9);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scaleY(1.1);
+  }
+  100% {
+    opacity: 0.7;
+    transform: scaleY(0.9);
+  }
+}
+
+.radar-beacon-ripple {
+  animation: radarBeaconExpand 2.2s cubic-bezier(0.1, 0.4, 0.2, 1) infinite;
+}
+
+.radar-sonar-disc {
+  animation: radarSonarSweep 4s linear infinite;
+}
+
+.strobe-left-red {
+  animation: strobeFlashRed 1.2s infinite;
+}
+
+.strobe-right-green {
+  animation: strobeFlashGreen 1.2s infinite;
+}
+
+.strobe-tail-white {
+  animation: strobeFlashWhite 1s infinite;
+}
+
+.contrail-glow {
+  animation: contrailStream 1.6s ease-in-out infinite;
+}
+
+/* Ensure Leaflet marker wrapper does not clip custom shadows or HUD tags */
+.custom-vehicle-radar-icon {
+  overflow: visible !important;
+  background: transparent !important;
+  border: none !important;
+}
+

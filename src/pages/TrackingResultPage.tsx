@@ -217,6 +217,35 @@ export const TrackingResultPage: React.FC<TrackingResultPageProps> = ({
           </div>
         )}
 
+        {/* EMPTY / INITIAL SEARCH PROMPT */}
+        {!loading && !shipment && !searched && (
+          <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-8 sm:p-12 text-center max-w-2xl mx-auto space-y-6 shadow-xl">
+            <div className="w-16 h-16 rounded-2xl bg-sky-500/10 text-sky-400 border border-sky-500/30 flex items-center justify-center mx-auto shadow-[0_0_20px_rgba(56,189,248,0.2)]">
+              <Package className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-white">Live Cargo Radar Search</h2>
+              <p className="text-sm text-slate-400 leading-relaxed max-w-md mx-auto">
+                Enter your 12-character GoTrack consignment reference to track transponder GPS position, waypoints, and milestone delivery status.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput('GT48291584US');
+                  setActiveCode('GT48291584US');
+                }}
+                className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-slate-950 font-black text-xs rounded-xl transition-all shadow-lg font-mono"
+              >
+                Track Live Sample Consignment: GT48291584US
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* NOT FOUND PAGE */}
         {!loading && searched && !shipment && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 sm:p-12 text-center max-w-2xl mx-auto space-y-6 shadow-xl">
